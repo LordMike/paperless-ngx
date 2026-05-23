@@ -535,6 +535,130 @@ class TestMail(
             ],
         )
 
+    def test_handle_message_bundles_body_and_attachments_when_enabled(self) -> None:
+        message = self.mailMocker.messageBuilder.create_message(
+            subject="Insurance policy package",
+            attachments=[
+                _AttachmentDef(filename="Policy schedule.pdf"),
+                _AttachmentDef(filename="General terms 2026.pdf"),
+            ],
+        )
+
+        account = MailAccount.objects.create()
+        rule = MailRule.objects.create(
+            account=account,
+            bundle_documents=True,
+            consumption_scope=MailRule.ConsumptionScope.EVERYTHING,
+            assign_title_from=MailRule.TitleSource.FROM_FILENAME,
+        )
+
+        result = self.mail_account_handler._handle_message(message, rule)
+
+        self.assertEqual(result, 3)
+        self.mailMocker.assert_queue_consumption_tasks_call_args(
+            [
+                [
+                    {
+                        "override_title": "Insurance policy package",
+                        "override_filename": "Insurance policy package.eml",
+                    },
+                    {
+                        "override_title": "Policy schedule",
+                        "override_filename": "Policy schedule.pdf",
+                    },
+                    {
+                        "override_title": "General terms 2026",
+                        "override_filename": "General terms 2026.pdf",
+                    },
+                ],
+            ],
+        )
+        self.assertEqual(
+            self.mailMocker._queue_consumption_tasks_mock.call_args.kwargs[
+                "bundle_item_names"
+            ],
+            ["mail body", "Policy schedule.pdf", "General terms 2026.pdf"],
+        )
+
+    def test_handle_message_bundles_attachments_only_when_enabled(self) -> None:
+        message = self.mailMocker.messageBuilder.create_message(
+            attachments=[
+                _AttachmentDef(filename="Policy schedule.pdf"),
+                _AttachmentDef(filename="Price notice.pdf"),
+            ],
+        )
+
+        account = MailAccount.objects.create()
+        rule = MailRule.objects.create(
+            account=account,
+            bundle_documents=True,
+            consumption_scope=MailRule.ConsumptionScope.ATTACHMENTS_ONLY,
+            assign_title_from=MailRule.TitleSource.FROM_FILENAME,
+        )
+
+        result = self.mail_account_handler._handle_message(message, rule)
+
+        self.assertEqual(result, 2)
+        self.mailMocker.assert_queue_consumption_tasks_call_args(
+            [
+                [
+                    {
+                        "override_title": "Policy schedule",
+                        "override_filename": "Policy schedule.pdf",
+                    },
+                    {
+                        "override_title": "Price notice",
+                        "override_filename": "Price notice.pdf",
+                    },
+                ],
+            ],
+        )
+        self.assertEqual(
+            self.mailMocker._queue_consumption_tasks_mock.call_args.kwargs[
+                "bundle_item_names"
+            ],
+            ["Policy schedule.pdf", "Price notice.pdf"],
+        )
+
+    def test_handle_message_does_not_bundle_unsupported_attachments(self) -> None:
+        message = self.mailMocker.messageBuilder.create_message(
+            attachments=[
+                _AttachmentDef(filename="Policy schedule.pdf"),
+                _AttachmentDef(
+                    filename="unsupported.json",
+                    content=b"{'unsupported': true}",
+                ),
+            ],
+        )
+
+        account = MailAccount.objects.create()
+        rule = MailRule.objects.create(
+            account=account,
+            bundle_documents=True,
+            consumption_scope=MailRule.ConsumptionScope.ATTACHMENTS_ONLY,
+            assign_title_from=MailRule.TitleSource.FROM_FILENAME,
+        )
+
+        result = self.mail_account_handler._handle_message(message, rule)
+
+        self.assertEqual(result, 1)
+        self.mailMocker.assert_queue_consumption_tasks_call_args(
+            [
+                [
+                    {
+                        "override_title": "Policy schedule",
+                        "override_filename": "Policy schedule.pdf",
+                    },
+                ],
+            ],
+        )
+        self.assertEqual(
+            self.mailMocker._queue_consumption_tasks_mock.call_args.kwargs[
+                "bundle_item_names"
+            ],
+            ["Policy schedule.pdf"],
+        )
+
     def test_handle_empty_message(self) -> None:
         message = namedtuple("MailMessage", [])
 
@@ -1719,6 +1843,57 @@ class TestPostConsumeAction(TestCase):
         )
 
         self.assertFalse(DocumentBundle.objects.exists())
+
+    @mock.patch("paperless_mail.mail.get_mailbox")
+    @mock.patch("paperless_mail.mail.mailbox_login")
+    @mock.patch("paperless_mail.mail.get_rule_action")
+    def test_post_consume_bundles_only_created_documents(
+        self,
+        mock_get_rule_action,
+        mock_mailbox_login,
+        mock_get_mailbox,
+    ) -> None:
+        self.rule.bundle_documents = True
+        self.rule.save()
+        mock_mailbox = mock.MagicMock()
+        mock_get_mailbox.return_value.__enter__.return_value = mock_mailbox
+        mock_get_rule_action.return_value = mock.MagicMock()
+        docs = [
+            DocumentFactory(title="Policy schedule"),
+            DocumentFactory(title="Price notice"),
+        ]
+
+        apply_mail_action(
+            result=[
+                {"document_id": docs[0].id},
+                {"error": "failed attachment"},
+                {"document_id": docs[1].id},
+            ],
+            rule_id=self.rule.pk,
+            message_uid=self.message_uid,
+            message_subject=self.message_subject,
+            message_date=self.message_date,
+            bundle_item_names=[
+                "Policy schedule.pdf",
+                "General terms 2026.pdf",
+                "Price notice.pdf",
+            ],
+        )
+
+        bundle = DocumentBundle.objects.get()
+        self.assertEqual(
+            list(
+                bundle.memberships.order_by("order_id").values_list(
+                    "document_id",
+                    "bundle_item_name",
+                    "order_id",
+                ),
+            ),
+            [
+                (docs[0].id, "Policy schedule.pdf", 1),
+                (docs[1].id, "Price notice.pdf", 2),
+            ],
+        )
 
 
 class TestManagementCommand(TestCase):
