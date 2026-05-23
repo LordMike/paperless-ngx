@@ -31,7 +31,7 @@
                   <i-bs name="grip-vertical"></i-bs>
                 </button>
                 <div>
-                  <div>{{item.bundle_item_name}}</div>
+                  <a routerLink="/documents/{{item.document}}">{{item.bundle_item_name}}</a>
                   @if (item.bundle_item_type) {
                     <div class="small text-muted">{{item.bundle_item_type}}</div>
                   }
@@ -39,9 +39,7 @@
               </div>
             </td>
             <td class="d-none d-sm-table-cell">{{item.created | customDate}}</td>
-            <td>
-              <a routerLink="/documents/{{item.document}}">{{item.document_title || item.document}}</a>
-            </td>
+            <td>{{item.document_title || item.document}}</td>
             <td class="text-end">
               <div class="btn-group btn-group-sm">
                 <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item" (click)="editItem(item)">
