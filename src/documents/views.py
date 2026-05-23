@@ -611,6 +611,7 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
                 bundle=bundle,
                 document=document,
                 bundle_item_name=serializer.validated_data.get("bundle_item_name"),
+                bundle_item_type=serializer.validated_data.get("bundle_item_type"),
             )
         except PermissionError:
             self._raise_permission_error()
@@ -646,6 +647,7 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
         membership = update_membership(
             membership=membership,
             bundle_item_name=serializer.validated_data.get("bundle_item_name"),
+            bundle_item_type=serializer.validated_data.get("bundle_item_type"),
         )
         return Response(DocumentBundleMembershipSerializer(membership).data)
 

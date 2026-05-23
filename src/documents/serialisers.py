@@ -975,6 +975,8 @@ class DocumentBundleItemSummarySerializer(serializers.Serializer[dict[str, Any]]
     document = serializers.IntegerField()
     order_id = serializers.IntegerField()
     bundle_item_name = serializers.CharField()
+    bundle_item_type = serializers.CharField()
+    created = serializers.DateTimeField()
     title = serializers.CharField(allow_blank=True)
 
 
@@ -984,6 +986,8 @@ class DocumentBundleSummarySerializer(serializers.Serializer[dict[str, Any]]):
     current_membership_id = serializers.IntegerField()
     current_order_id = serializers.IntegerField()
     current_bundle_item_name = serializers.CharField()
+    current_bundle_item_type = serializers.CharField()
+    current_membership_created = serializers.DateTimeField()
     items = DocumentBundleItemSummarySerializer(many=True)
 
 
@@ -998,6 +1002,7 @@ class DocumentBundleMembershipSerializer(serializers.ModelSerializer):
             "document_title",
             "order_id",
             "bundle_item_name",
+            "bundle_item_type",
             "created",
         )
         read_only_fields = ("id", "order_id", "created", "document_title")
@@ -1009,6 +1014,11 @@ class DocumentBundleCreateItemSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         max_length=256,
+    )
+    bundle_item_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=128,
     )
 
 
@@ -1067,6 +1077,7 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
                 BundleItemInput(
                     document=item["document"],
                     bundle_item_name=item.get("bundle_item_name"),
+                    bundle_item_type=item.get("bundle_item_type"),
                 )
                 for item in create_items
             ]
@@ -1093,6 +1104,11 @@ class DocumentBundleAddDocumentSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=256,
     )
+    bundle_item_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=128,
+    )
 
 
 class DocumentBundleMembershipUpdateSerializer(serializers.Serializer):
@@ -1100,6 +1116,11 @@ class DocumentBundleMembershipUpdateSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         max_length=256,
+    )
+    bundle_item_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=128,
     )
 
 
@@ -1206,6 +1227,8 @@ class DocumentSerializer(
                 "document": item.document_id,
                 "order_id": item.order_id,
                 "bundle_item_name": item.bundle_item_name,
+                "bundle_item_type": item.bundle_item_type,
+                "created": item.created,
                 "title": item.document.title,
             }
             for item in bundle_memberships
@@ -1217,6 +1240,8 @@ class DocumentSerializer(
             "current_membership_id": membership.id,
             "current_order_id": membership.order_id,
             "current_bundle_item_name": membership.bundle_item_name,
+            "current_bundle_item_type": membership.bundle_item_type,
+            "current_membership_created": membership.created,
             "items": items,
         }
 

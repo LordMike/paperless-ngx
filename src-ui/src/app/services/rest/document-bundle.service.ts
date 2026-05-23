@@ -40,13 +40,15 @@ export class DocumentBundleService extends AbstractPaperlessService<DocumentBund
   updateMembership(
     bundleId: number,
     membershipId: number,
-    bundleItemName: string
+    bundleItemName: string,
+    bundleItemType?: string
   ): Observable<DocumentBundleItem> {
     this.clearCache()
     return this.http.patch<DocumentBundleItem>(
       `${this.getResourceUrl(bundleId, 'documents')}${membershipId}/`,
       {
         bundle_item_name: bundleItemName,
+        bundle_item_type: bundleItemType ?? '',
       }
     )
   }

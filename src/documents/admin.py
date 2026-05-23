@@ -125,7 +125,13 @@ class DocumentAdmin(GuardedModelAdmin):
 class DocumentBundleMembershipInline(admin.TabularInline):
     model = DocumentBundleMembership
     extra = 0
-    fields = ("order_id", "document", "bundle_item_name", "created")
+    fields = (
+        "order_id",
+        "document",
+        "bundle_item_name",
+        "bundle_item_type",
+        "created",
+    )
     readonly_fields = ("created",)
 
 

@@ -48,12 +48,17 @@ describe('DocumentBundleService', () => {
   })
 
   it('updates a membership name', () => {
-    subscription = service.updateMembership(4, 9, 'terms').subscribe()
+    subscription = service
+      .updateMembership(4, 9, 'terms', 'appendix')
+      .subscribe()
     const req = httpTestingController.expectOne(
       `${environment.apiBaseUrl}${endpoint}/4/documents/9/`
     )
     expect(req.request.method).toBe('PATCH')
-    expect(req.request.body).toEqual({ bundle_item_name: 'terms' })
+    expect(req.request.body).toEqual({
+      bundle_item_name: 'terms',
+      bundle_item_type: 'appendix',
+    })
     req.flush({})
   })
 

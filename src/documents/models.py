@@ -582,6 +582,12 @@ class DocumentBundleMembership(models.Model):
         blank=True,
     )
 
+    bundle_item_type = models.CharField(
+        _("bundle item type"),
+        max_length=128,
+        blank=True,
+    )
+
     created = models.DateTimeField(
         _("created"),
         default=timezone.now,

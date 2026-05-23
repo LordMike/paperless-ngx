@@ -1,24 +1,32 @@
+import {
+  CdkDragDrop,
+  DragDropModule,
+  moveItemInArray,
+} from '@angular/cdk/drag-drop'
 import { Component, inject, OnInit } from '@angular/core'
-import { FormsModule } from '@angular/forms'
 import { ActivatedRoute, Router, RouterModule } from '@angular/router'
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import {
   DocumentBundle,
   DocumentBundleItem,
 } from 'src/app/data/document-bundle'
+import { CustomDatePipe } from 'src/app/pipes/custom-date.pipe'
 import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { ToastService } from 'src/app/services/toast.service'
 import { PageHeaderComponent } from '../common/page-header/page-header.component'
+import { DocumentBundleItemEditDialogComponent } from '../document-bundle-item-edit-dialog/document-bundle-item-edit-dialog.component'
 
 @Component({
   selector: 'pngx-document-bundle-detail',
   templateUrl: './document-bundle-detail.component.html',
   styleUrls: ['./document-bundle-detail.component.scss'],
   imports: [
-    FormsModule,
     RouterModule,
     NgxBootstrapIconsModule,
     PageHeaderComponent,
+    CustomDatePipe,
+    DragDropModule,
   ],
 })
 export class DocumentBundleDetailComponent implements OnInit {
@@ -26,10 +34,10 @@ export class DocumentBundleDetailComponent implements OnInit {
   private readonly router = inject(Router)
   private readonly bundleService = inject(DocumentBundleService)
   private readonly toastService = inject(ToastService)
+  private readonly modalService = inject(NgbModal)
 
   bundle: DocumentBundle
-  addDocumentId: number
-  orderEdits: Record<number, number> = {}
+  orderSaving = false
 
   ngOnInit(): void {
     this.load()
@@ -40,47 +48,48 @@ export class DocumentBundleDetailComponent implements OnInit {
     this.bundleService.get(id).subscribe({
       next: (bundle) => {
         this.bundle = bundle
-        this.orderEdits = {}
-        bundle.items?.forEach(
-          (item) => (this.orderEdits[item.id] = item.order_id)
-        )
       },
       error: (error) =>
         this.toastService.showError($localize`Error loading bundle`, error),
     })
   }
 
-  openDocument(item: DocumentBundleItem) {
-    this.router.navigate(['documents', item.document])
-  }
-
-  addDocument() {
-    if (!this.addDocumentId) return
-    this.bundleService
-      .addDocument(this.bundle.id, this.addDocumentId)
-      .subscribe({
-        next: () => {
-          this.addDocumentId = null
-          this.load()
-        },
-        error: (error) =>
-          this.toastService.showError($localize`Error adding document`, error),
-      })
-  }
-
-  editName(item: DocumentBundleItem) {
-    const name = window.prompt(
-      $localize`Bundle item name`,
-      item.bundle_item_name
+  editItem(item: DocumentBundleItem) {
+    const modal = this.modalService.open(
+      DocumentBundleItemEditDialogComponent,
+      {
+        backdrop: 'static',
+      }
     )
-    if (name === null) return
-    this.bundleService
-      .updateMembership(this.bundle.id, item.id, name)
-      .subscribe({
-        next: () => this.load(),
-        error: (error) =>
-          this.toastService.showError($localize`Error updating bundle`, error),
-      })
+    modal.componentInstance.item = item
+    modal.componentInstance.saved.subscribe(
+      ({
+        bundle_item_name,
+        bundle_item_type,
+      }: {
+        bundle_item_name: string
+        bundle_item_type: string
+      }) => {
+        this.bundleService
+          .updateMembership(
+            this.bundle.id,
+            item.id,
+            bundle_item_name,
+            bundle_item_type
+          )
+          .subscribe({
+            next: () => {
+              modal.close()
+              this.load()
+            },
+            error: (error) =>
+              this.toastService.showError(
+                $localize`Error updating bundle`,
+                error
+              ),
+          })
+      }
+    )
   }
 
   remove(item: DocumentBundleItem) {
@@ -91,17 +100,26 @@ export class DocumentBundleDetailComponent implements OnInit {
     })
   }
 
-  saveOrder() {
-    const membershipIds = [...(this.bundle.items ?? [])]
-      .sort((a, b) => this.orderEdits[a.id] - this.orderEdits[b.id])
-      .map((item) => item.id)
+  drop(event: CdkDragDrop<DocumentBundleItem[]>) {
+    if (!this.bundle?.items || event.previousIndex === event.currentIndex) {
+      return
+    }
+    moveItemInArray(this.bundle.items, event.previousIndex, event.currentIndex)
+    const membershipIds = this.bundle.items.map((item) => item.id)
+    this.orderSaving = true
     this.bundleService.reorder(this.bundle.id, membershipIds).subscribe({
-      next: () => this.load(),
-      error: (error) =>
+      next: () => {
+        this.orderSaving = false
+        this.load()
+      },
+      error: (error) => {
+        this.orderSaving = false
+        this.load()
         this.toastService.showError(
           $localize`Error updating bundle order`,
           error
-        ),
+        )
+      },
     })
   }
 

@@ -5,6 +5,7 @@ export interface DocumentBundleItem extends ObjectWithId {
   document_title?: string
   order_id: number
   bundle_item_name: string
+  bundle_item_type?: string
   created?: string
 }
 
@@ -16,6 +17,7 @@ export interface DocumentBundle extends ObjectWithId {
   create_items?: {
     document: number
     bundle_item_name?: string
+    bundle_item_type?: string
   }[]
 }
 
@@ -24,6 +26,8 @@ export interface DocumentBundleDocumentSummary {
   document: number
   order_id: number
   bundle_item_name: string
+  bundle_item_type?: string
+  created?: string
   title: string
 }
 
@@ -33,5 +37,7 @@ export interface DocumentBundleSummary {
   current_membership_id: number
   current_order_id: number
   current_bundle_item_name: string
+  current_bundle_item_type?: string
+  current_membership_created?: string
   items: DocumentBundleDocumentSummary[]
 }

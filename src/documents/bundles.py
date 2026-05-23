@@ -26,6 +26,7 @@ BUNDLE_ID_ALLOWED_CHARS = set(string.ascii_uppercase + string.digits + "_-")
 class BundleItemInput:
     document: Document
     bundle_item_name: str | None = None
+    bundle_item_type: str | None = None
 
 
 def normalize_bundle_id(bundle_id: str) -> str:
@@ -121,6 +122,7 @@ def create_bundle(
                 bundle_item_name=(
                     item.bundle_item_name or default_bundle_item_name(item.document)
                 ),
+                bundle_item_type=item.bundle_item_type or "",
             )
             for index, item in enumerate(items, start=1)
         ]
@@ -133,6 +135,7 @@ def add_document_to_bundle(
     bundle: DocumentBundle,
     document: Document,
     bundle_item_name: str | None = None,
+    bundle_item_type: str | None = None,
 ) -> DocumentBundleMembership:
     _validate_documents_are_unbundled([document])
     with transaction.atomic():
@@ -147,6 +150,7 @@ def add_document_to_bundle(
             document=document,
             order_id=next_order_id,
             bundle_item_name=bundle_item_name or default_bundle_item_name(document),
+            bundle_item_type=bundle_item_type or "",
         )
 
 
@@ -154,10 +158,17 @@ def update_membership(
     *,
     membership: DocumentBundleMembership,
     bundle_item_name: str | None = None,
+    bundle_item_type: str | None = None,
 ) -> DocumentBundleMembership:
+    update_fields = []
     if bundle_item_name is not None:
         membership.bundle_item_name = bundle_item_name
-        membership.save(update_fields=["bundle_item_name"])
+        update_fields.append("bundle_item_name")
+    if bundle_item_type is not None:
+        membership.bundle_item_type = bundle_item_type
+        update_fields.append("bundle_item_type")
+    if update_fields:
+        membership.save(update_fields=update_fields)
     return membership
 
 

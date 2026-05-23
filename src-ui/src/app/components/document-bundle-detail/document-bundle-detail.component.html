@@ -5,45 +5,46 @@
 </pngx-page-header>
 
 @if (bundle) {
-  <div class="mb-3 d-flex flex-wrap gap-2 align-items-end">
-    <div>
-      <label class="form-label" for="bundleAddDocument" i18n>Document ID</label>
-      <input id="bundleAddDocument" class="form-control form-control-sm" type="number" min="1" [(ngModel)]="addDocumentId">
+  @if (orderSaving) {
+    <div class="mb-2 small text-muted">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      <ng-container i18n>Saving order...</ng-container>
     </div>
-    <button type="button" class="btn btn-sm btn-outline-primary" (click)="addDocument()" [disabled]="!addDocumentId">
-      <i-bs name="plus-lg" class="me-1"></i-bs><ng-container i18n>Add document</ng-container>
-    </button>
-    <button type="button" class="btn btn-sm btn-outline-primary ms-auto" (click)="saveOrder()">
-      <i-bs name="sort-numeric-down" class="me-1"></i-bs><ng-container i18n>Save order</ng-container>
-    </button>
-  </div>
+  }
 
-  <div class="table-responsive">
-    <table class="table table-sm align-middle border shadow-sm">
+  <div class="card border table-responsive mb-3">
+    <table class="table table-striped align-middle shadow-sm mb-0">
       <thead>
         <tr>
-          <th i18n>Order</th>
           <th i18n>Name</th>
+          <th class="d-none d-sm-table-cell" i18n>Added</th>
           <th i18n>Document</th>
           <th></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody cdkDropList (cdkDropListDropped)="drop($event)">
         @for (item of bundle.items; track item.id) {
-          <tr>
-            <td style="width: 8rem;">
-              <input class="form-control form-control-sm" type="number" min="1" [(ngModel)]="orderEdits[item.id]">
+          <tr cdkDrag>
+            <td>
+              <div class="d-flex align-items-center">
+                <button type="button" class="btn btn-link text-muted p-0 me-2 drag-handle" cdkDragHandle i18n-title title="Drag to reorder">
+                  <i-bs name="grip-vertical"></i-bs>
+                </button>
+                <div>
+                  <div>{{item.bundle_item_name}}</div>
+                  @if (item.bundle_item_type) {
+                    <div class="small text-muted">{{item.bundle_item_type}}</div>
+                  }
+                </div>
+              </div>
             </td>
-            <td>{{item.bundle_item_name}}</td>
+            <td class="d-none d-sm-table-cell">{{item.created | customDate}}</td>
             <td>
               <a routerLink="/documents/{{item.document}}">{{item.document_title || item.document}}</a>
             </td>
             <td class="text-end">
               <div class="btn-group btn-group-sm">
-                <button type="button" class="btn btn-outline-secondary" i18n-title title="Open document" (click)="openDocument(item)">
-                  <i-bs name="box-arrow-up-right"></i-bs>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit name" (click)="editName(item)">
+                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item" (click)="editItem(item)">
                   <i-bs name="pencil"></i-bs>
                 </button>
                 <button type="button" class="btn btn-outline-danger" i18n-title title="Remove from bundle" (click)="remove(item)">

@@ -12,21 +12,25 @@ DEMO_BUNDLES = {
         (
             "Bundle demo - Insurance mail body",
             "mail body",
+            "cover letter",
             "Email cover letter for the insurance policy package.",
         ),
         (
             "Bundle demo - Policy schedule",
             "Policy schedule.pdf",
+            "schedule",
             "Policy schedule for the insurance package.",
         ),
         (
             "Bundle demo - General terms 2026",
             "General terms 2026.pdf",
+            "terms",
             "General insurance terms for 2026.",
         ),
         (
             "Bundle demo - Price notice",
             "Price notice.pdf",
+            "notice",
             "Price notice for the insurance package.",
         ),
     ],
@@ -34,16 +38,19 @@ DEMO_BUNDLES = {
         (
             "Bundle demo - Employment contract",
             "employment contract",
+            "contract",
             "Employment contract text.",
         ),
         (
             "Bundle demo - Ownership agreement",
             "ownership agreement",
+            "agreement",
             "Ownership agreement text.",
         ),
         (
             "Bundle demo - Vesting appendix",
             "vesting appendix",
+            "appendix",
             "Appendix A vesting terms.",
         ),
     ],
@@ -51,16 +58,19 @@ DEMO_BUNDLES = {
         (
             "Bundle demo - Claim cover letter",
             "claim cover letter",
+            "cover letter",
             "Cover letter for a claim package.",
         ),
         (
             "Bundle demo - Repair estimate",
             "Repair estimate.pdf",
+            "estimate",
             "Repair estimate document.",
         ),
         (
             "Bundle demo - Photos inventory",
             "Photos inventory.pdf",
+            "inventory",
             "Inventory of submitted claim photos.",
         ),
     ],
@@ -123,7 +133,7 @@ Document.objects.filter(title__startswith="Bundle demo - ").delete()
 
 for bundle_id, entries in DEMO_BUNDLES.items():
     items = []
-    for index, (title, item_name, content) in enumerate(entries, start=1):
+    for index, (title, item_name, item_type, content) in enumerate(entries, start=1):
         document = Document.objects.create(
             title=title,
             content=content,
@@ -134,7 +144,11 @@ for bundle_id, entries in DEMO_BUNDLES.items():
         )
         write_demo_pdf(document, content)
         items.append(
-            BundleItemInput(document=document, bundle_item_name=item_name),
+            BundleItemInput(
+                document=document,
+                bundle_item_name=item_name,
+                bundle_item_type=item_type,
+            ),
         )
     create_bundle(items=items, bundle_id=bundle_id)
 
