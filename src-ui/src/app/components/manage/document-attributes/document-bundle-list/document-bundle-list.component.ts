@@ -16,6 +16,11 @@ import {
   SortableDirective,
 } from 'src/app/directives/sortable.directive'
 import { CustomDatePipe } from 'src/app/pipes/custom-date.pipe'
+import {
+  PermissionAction,
+  PermissionType,
+  PermissionsService,
+} from 'src/app/services/permissions.service'
 import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { ToastService } from 'src/app/services/toast.service'
 
@@ -36,6 +41,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
   private readonly bundleService = inject(DocumentBundleService)
   private readonly modalService = inject(NgbModal)
   private readonly toastService = inject(ToastService)
+  private readonly permissionsService = inject(PermissionsService)
   private readonly unsubscribeNotifier = new Subject<void>()
   private readonly filterDebounce = new Subject<string>()
 
@@ -48,6 +54,13 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
   sortField = 'bundle_id'
   sortReverse = false
   bundleFilter = ''
+
+  get userCanEditBundles(): boolean {
+    return this.permissionsService.currentUserCan(
+      PermissionAction.Change,
+      PermissionType.Document
+    )
+  }
 
   ngOnInit(): void {
     this.filterDebounce
@@ -107,6 +120,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
   }
 
   openEditDialog(bundle: DocumentBundle): void {
+    if (!this.userCanEditBundles) return
     const modal = this.modalService.open(DocumentBundleEditDialogComponent, {
       backdrop: 'static',
     })
@@ -132,6 +146,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
   }
 
   openDeleteDialog(bundle: DocumentBundle): void {
+    if (!this.userCanEditBundles) return
     const modal = this.modalService.open(ConfirmDialogComponent, {
       backdrop: 'static',
     })

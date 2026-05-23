@@ -26,6 +26,15 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "name",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        max_length=128,
+                        verbose_name="name",
+                    ),
+                ),
+                (
                     "bundle_id",
                     models.CharField(
                         db_index=True,
@@ -34,8 +43,8 @@ class Migration(migrations.Migration):
                         unique=True,
                         validators=[
                             django.core.validators.RegexValidator(
-                                message="Bundle IDs may only contain A-Z, 0-9, underscores, and hyphens.",
-                                regex="^[A-Z0-9_-]+$",
+                                message="Bundle IDs may only contain A-Z, 0-9, and hyphens.",
+                                regex="^[A-Z0-9-]+$",
                             ),
                         ],
                         verbose_name="bundle id",
@@ -82,6 +91,14 @@ class Migration(migrations.Migration):
                         blank=True,
                         max_length=256,
                         verbose_name="bundle item name",
+                    ),
+                ),
+                (
+                    "bundle_item_type",
+                    models.CharField(
+                        blank=True,
+                        max_length=128,
+                        verbose_name="bundle item type",
                     ),
                 ),
                 (

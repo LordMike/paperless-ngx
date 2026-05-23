@@ -38,10 +38,6 @@ import { CustomField, CustomFieldDataType } from 'src/app/data/custom-field'
 import { CustomFieldInstance } from 'src/app/data/custom-field-instance'
 import { DataType } from 'src/app/data/datatype'
 import { Document, DocumentVersionInfo } from 'src/app/data/document'
-import {
-  DocumentBundle,
-  DocumentBundleDocumentSummary,
-} from 'src/app/data/document-bundle'
 import { DocumentMetadata } from 'src/app/data/document-metadata'
 import { DocumentNote } from 'src/app/data/document-note'
 import { DocumentSuggestions } from 'src/app/data/document-suggestions'
@@ -77,7 +73,6 @@ import {
 } from 'src/app/services/permissions.service'
 import { CorrespondentService } from 'src/app/services/rest/correspondent.service'
 import { CustomFieldsService } from 'src/app/services/rest/custom-fields.service'
-import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { DocumentTypeService } from 'src/app/services/rest/document-type.service'
 import {
   BulkEditSourceMode,
@@ -127,9 +122,10 @@ import {
 } from '../common/pdf-viewer/pdf-viewer.types'
 import { ShareLinksDialogComponent } from '../common/share-links-dialog/share-links-dialog.component'
 import { SuggestionsDropdownComponent } from '../common/suggestions-dropdown/suggestions-dropdown.component'
-import { DocumentBundleEditDialogComponent } from '../document-bundle-edit-dialog/document-bundle-edit-dialog.component'
 import { DocumentNotesComponent } from '../document-notes/document-notes.component'
 import { ComponentWithPermissions } from '../with-permissions/with-permissions.component'
+import { DocumentBundleMenuComponent } from './document-bundle-menu/document-bundle-menu.component'
+import { DocumentBundleTabComponent } from './document-bundle-tab/document-bundle-tab.component'
 import { DocumentHistoryComponent } from './document-history/document-history.component'
 import { DocumentVersionDropdownComponent } from './document-version-dropdown/document-version-dropdown.component'
 import { MetadataCollapseComponent } from './metadata-collapse/metadata-collapse.component'
@@ -158,13 +154,6 @@ enum ContentRenderType {
 interface IncomingDocumentUpdate {
   document_id: number
   modified: string
-}
-
-interface PreviewError {
-  title: string
-  message: string
-  status?: number
-  actions: string[]
 }
 
 @Component({
@@ -203,6 +192,8 @@ interface PreviewError {
     RouterModule,
     PngxPdfViewerComponent,
     DocumentVersionDropdownComponent,
+    DocumentBundleMenuComponent,
+    DocumentBundleTabComponent,
   ],
 })
 export class DocumentDetailComponent
@@ -227,7 +218,6 @@ export class DocumentDetailComponent
   private permissionsService = inject(PermissionsService)
   private userService = inject(UserService)
   private customFieldsService = inject(CustomFieldsService)
-  private documentBundleService = inject(DocumentBundleService)
   private http = inject(HttpClient)
   private hotKeyService = inject(HotKeyService)
   private componentRouterService = inject(ComponentRouterService)
@@ -261,7 +251,6 @@ export class DocumentDetailComponent
   thumbUrl: string
   previewText: string
   previewLoaded: boolean = false
-  previewError: PreviewError | null = null
   tiffURL: string
   tiffError: string
 
@@ -271,13 +260,6 @@ export class DocumentDetailComponent
   correspondents: Correspondent[]
   documentTypes: DocumentType[]
   storagePaths: StoragePath[]
-  bundles: DocumentBundle[] = []
-  selectedBundleId: number | null
-  bundleItemName = ''
-  bundleItemType = ''
-  bundleItemNameOriginal = ''
-  bundleItemTypeOriginal = ''
-  bundleMembershipSaving = false
 
   documentForm: FormGroup = new FormGroup({
     title: new FormControl(''),
@@ -365,13 +347,6 @@ export class DocumentDetailComponent
         )
   }
 
-  get bundleMembershipDirty(): boolean {
-    return (
-      this.bundleItemName !== this.bundleItemNameOriginal ||
-      this.bundleItemType !== this.bundleItemTypeOriginal
-    )
-  }
-
   get originalContentRenderType(): ContentRenderType {
     return this.getRenderType(
       this.metadata?.original_mime_type || this.document?.mime_type
@@ -408,67 +383,6 @@ export class DocumentDetailComponent
     this.pdfSource = {
       url: this.previewUrl,
       password: this.password,
-    }
-  }
-
-  private clearPreviewError() {
-    this.previewError = null
-  }
-
-  private getPreviewErrorStatus(event: any): number | null {
-    const status = event?.status ?? event?.response?.status
-    if (typeof status === 'number') {
-      return status
-    }
-    if (typeof event?.message === 'string') {
-      const match = event.message.match(/\b(4\d\d|5\d\d)\b/)
-      if (match) {
-        return Number(match[1])
-      }
-    }
-    return null
-  }
-
-  private setPreviewError(event: any) {
-    const status = this.getPreviewErrorStatus(event)
-    if (status === 404) {
-      this.previewError = {
-        title: $localize`Preview file not found`,
-        message: $localize`The document record exists, but the file used for preview is missing or unavailable.`,
-        status,
-        actions: [
-          $localize`Run the sanity checker from System Status or with the document_sanity_checker management command to find missing or inaccessible files.`,
-          $localize`Check that the document storage volume is mounted and that Paperless can read the original and archive files.`,
-          $localize`Restore the missing file from backup or re-consume the document if the file was removed.`,
-        ],
-      }
-      return
-    }
-    if (status === 403) {
-      this.previewError = {
-        title: $localize`Preview access denied`,
-        message: $localize`Paperless refused access to the preview file for this document.`,
-        status,
-        actions: [
-          $localize`Refresh the page and confirm that your user still has permission to view this document.`,
-          $localize`Ask an administrator to check document ownership, permissions, and storage access.`,
-          $localize`Run the sanity checker if permissions look correct but the file still cannot be accessed.`,
-        ],
-      }
-      return
-    }
-    this.previewError = {
-      title: $localize`Unable to load preview`,
-      message:
-        status != null
-          ? $localize`The preview request failed with HTTP status ${status}.`
-          : $localize`The preview request failed before the document could be displayed.`,
-      status: status ?? undefined,
-      actions: [
-        $localize`Try again later or refresh the page in case this was a temporary server or network problem.`,
-        $localize`Check System Status and task logs for server errors.`,
-        $localize`Run the sanity checker from System Status or with the document_sanity_checker management command to verify document files and thumbnails.`,
-      ],
     }
   }
 
@@ -794,6 +708,10 @@ export class DocumentDetailComponent
     this.toastService.showInfo($localize`Document reloaded.`)
   }
 
+  onBundleChanged() {
+    this.reloadRemoteVersion()
+  }
+
   ngOnInit(): void {
     this.setZoom(
       this.settings.get(SETTINGS_KEYS.PDF_VIEWER_ZOOM_SETTING) as PdfZoomScale
@@ -837,14 +755,6 @@ export class DocumentDetailComponent
         .listAll()
         .pipe(first(), takeUntil(this.unsubscribeNotifier))
         .subscribe((result) => (this.storagePaths = result.results))
-    }
-    if (
-      this.permissionsService.currentUserCan(
-        PermissionAction.View,
-        PermissionType.Document
-      )
-    ) {
-      this.loadBundles()
     }
     if (
       this.permissionsService.currentUserCan(
@@ -971,7 +881,6 @@ export class DocumentDetailComponent
       ? Math.max(...versions.map((version) => version.id))
       : doc.id
     this.previewLoaded = false
-    this.clearPreviewError()
     this.requiresPassword = false
     this.updateFormForCustomFields()
     this.loadMetadataForSelectedVersion()
@@ -994,11 +903,6 @@ export class DocumentDetailComponent
     }
     this.title = this.documentTitlePipe.transform(doc.title)
     this.prepareForm(doc)
-    this.selectedBundleId = doc.bundle?.id ?? null
-    this.bundleItemName = doc.bundle?.current_bundle_item_name ?? ''
-    this.bundleItemType = doc.bundle?.current_bundle_item_type ?? ''
-    this.bundleItemNameOriginal = this.bundleItemName
-    this.bundleItemTypeOriginal = this.bundleItemType
 
     if (
       this.activeNavID === DocumentDetailNavIDs.Duplicates &&
@@ -1015,7 +919,6 @@ export class DocumentDetailComponent
   selectVersion(versionId: number) {
     this.selectedVersionId = versionId
     this.previewLoaded = false
-    this.clearPreviewError()
     this.previewUrl = this.documentsService.getPreviewUrl(
       this.documentId,
       false,
@@ -1600,265 +1503,8 @@ export class DocumentDetailComponent
       })
   }
 
-  getBundlePrevious(): DocumentBundleDocumentSummary {
-    return this.document?.bundle?.items
-      ?.filter((item) => item.order_id < this.document.bundle.current_order_id)
-      .sort((a, b) => b.order_id - a.order_id)[0]
-  }
-
-  getBundleNext(): DocumentBundleDocumentSummary {
-    return this.document?.bundle?.items
-      ?.filter((item) => item.order_id > this.document.bundle.current_order_id)
-      .sort((a, b) => a.order_id - b.order_id)[0]
-  }
-
-  openBundleItem(item: DocumentBundleDocumentSummary) {
-    if (!item || item.document === this.documentId) return
-    this.router.navigate(['documents', item.document])
-  }
-
-  getBundleLabel(
-    bundle: DocumentBundle | { name?: string; bundle_id?: string }
-  ) {
-    return bundle?.name || bundle?.bundle_id
-  }
-
-  getBundleOptionLabel(
-    bundle: DocumentBundle | { name?: string; bundle_id?: string }
-  ) {
-    return bundle?.name
-      ? `${bundle.name} (${bundle.bundle_id})`
-      : bundle?.bundle_id
-  }
-
-  onBundleSelectionChange(bundleId: number | null) {
-    if (!this.document) {
-      this.selectedBundleId = this.document?.bundle?.id ?? null
-      return
-    }
-    if (!bundleId) {
-      if (this.document.bundle) {
-        this.confirmRemoveFromBundle()
-      } else {
-        this.selectedBundleId = null
-      }
-      return
-    }
-    if (this.document.bundle) {
-      if (bundleId === this.document.bundle.id) return
-      this.confirmMoveToBundle(bundleId)
-      return
-    }
-    this.addToBundle(bundleId)
-  }
-
-  private confirmMoveToBundle(bundleId: number) {
-    const targetBundle = this.bundles.find((bundle) => bundle.id === bundleId)
-    if (!targetBundle || !this.document?.bundle) {
-      this.selectedBundleId = this.document?.bundle?.id ?? null
-      return
-    }
-    const sourceBundle = this.document.bundle
-    const modal = this.modalService.open(ConfirmDialogComponent, {
-      backdrop: 'static',
-    })
-    let confirmed = false
-    modal.componentInstance.title = $localize`Move document`
-    modal.componentInstance.message = $localize`Move this document from bundle <strong>${this.escapeHtml(this.getBundleLabel(sourceBundle))}</strong> to bundle <strong>${this.escapeHtml(this.getBundleLabel(targetBundle))}</strong>?`
-    modal.componentInstance.btnCaption = $localize`Move`
-    modal.componentInstance.confirmClicked.subscribe(() => {
-      confirmed = true
-      modal.componentInstance.buttonsEnabled = false
-      this.documentBundleService
-        .moveDocument(
-          targetBundle.id,
-          sourceBundle.current_membership_id,
-          sourceBundle.current_bundle_item_name,
-          sourceBundle.current_bundle_item_type
-        )
-        .pipe(first())
-        .subscribe({
-          next: () => {
-            modal.close()
-            this.loadBundles()
-            this.reloadRemoteVersion()
-          },
-          error: (error) => {
-            modal.componentInstance.buttonsEnabled = true
-            this.selectedBundleId = sourceBundle.id
-            this.toastService.showError($localize`Error moving document`, error)
-          },
-        })
-    })
-    modal.result.then(() => {
-      if (!confirmed) this.selectedBundleId = sourceBundle.id
-    })
-  }
-
-  private confirmRemoveFromBundle() {
-    if (!this.document?.bundle) return
-    const sourceBundle = this.document.bundle
-    const modal = this.modalService.open(ConfirmDialogComponent, {
-      backdrop: 'static',
-    })
-    let confirmed = false
-    modal.componentInstance.title = $localize`Remove from bundle`
-    modal.componentInstance.message = $localize`Remove this document from bundle <strong>${this.escapeHtml(this.getBundleLabel(sourceBundle))}</strong>?`
-    modal.componentInstance.btnClass = 'btn-danger'
-    modal.componentInstance.btnCaption = $localize`Remove`
-    modal.componentInstance.confirmClicked.subscribe(() => {
-      confirmed = true
-      modal.componentInstance.buttonsEnabled = false
-      this.removeFromBundle({
-        next: () => modal.close(),
-        error: () => (modal.componentInstance.buttonsEnabled = true),
-      })
-    })
-    modal.result.then(() => {
-      if (!confirmed) this.selectedBundleId = sourceBundle.id
-    })
-  }
-
-  removeFromBundle(callbacks?: { next?: () => void; error?: () => void }) {
-    if (!this.document?.bundle) return
-    this.documentBundleService
-      .removeMembership(
-        this.document.bundle.id,
-        this.document.bundle.current_membership_id
-      )
-      .pipe(first())
-      .subscribe({
-        next: () => {
-          this.loadBundles()
-          this.reloadRemoteVersion()
-          callbacks?.next?.()
-        },
-        error: (error) => {
-          this.selectedBundleId = this.document?.bundle?.id ?? null
-          callbacks?.error?.()
-          this.toastService.showError($localize`Error updating bundle`, error)
-        },
-      })
-  }
-
-  saveCurrentBundleMembership() {
-    if (
-      !this.document?.bundle ||
-      !this.bundleMembershipDirty ||
-      this.bundleMembershipSaving
-    )
-      return
-    this.bundleMembershipSaving = true
-    this.documentBundleService
-      .updateMembership(
-        this.document.bundle.id,
-        this.document.bundle.current_membership_id,
-        this.bundleItemName,
-        this.bundleItemType
-      )
-      .pipe(first())
-      .subscribe({
-        next: () => {
-          this.bundleItemNameOriginal = this.bundleItemName
-          this.bundleItemTypeOriginal = this.bundleItemType
-          this.bundleMembershipSaving = false
-          this.reloadRemoteVersion()
-        },
-        error: (error) => {
-          this.bundleMembershipSaving = false
-          this.toastService.showError($localize`Error updating bundle`, error)
-        },
-      })
-  }
-
-  discardBundleMembershipChanges() {
-    this.bundleItemName = this.bundleItemNameOriginal
-    this.bundleItemType = this.bundleItemTypeOriginal
-  }
-
-  addToSelectedBundle() {
-    if (!this.document || this.document.bundle || !this.selectedBundleId) return
-    this.addToBundle(this.selectedBundleId)
-  }
-
-  private addToBundle(bundleId: number) {
-    if (!this.document) return
-    this.documentBundleService
-      .addDocument(bundleId, this.documentId)
-      .pipe(first())
-      .subscribe({
-        next: () => {
-          this.loadBundles()
-          this.reloadRemoteVersion()
-        },
-        error: (error) => {
-          this.selectedBundleId = this.document?.bundle?.id ?? null
-          this.toastService.showError($localize`Error updating bundle`, error)
-        },
-      })
-  }
-
-  createBundleForCurrentDocument() {
-    this.documentBundleService
-      .suggestId()
-      .pipe(first())
-      .subscribe({
-        next: ({ bundle_id }) => this.openCreateBundleDialog(bundle_id),
-        error: () => this.openCreateBundleDialog(''),
-      })
-  }
-
-  private openCreateBundleDialog(bundleId: string) {
-    if (!this.document) return
-    const modal = this.modalService.open(DocumentBundleEditDialogComponent, {
-      backdrop: 'static',
-    })
-    modal.componentInstance.mode = 'create'
-    modal.componentInstance.bundle = {
-      name: '',
-      bundle_id: bundleId,
-    } as DocumentBundle
-    modal.componentInstance.saved.subscribe(({ name, bundle_id }) => {
-      modal.componentInstance.networkActive = true
-      modal.componentInstance.error = null
-      this.documentBundleService
-        .createForDocument(this.documentId, bundle_id, name)
-        .pipe(first())
-        .subscribe({
-          next: () => {
-            modal.close()
-            this.loadBundles()
-            this.reloadRemoteVersion()
-          },
-          error: (error) => {
-            modal.componentInstance.networkActive = false
-            modal.componentInstance.error = error?.error ?? error
-            this.toastService.showError($localize`Error creating bundle`, error)
-          },
-        })
-    })
-  }
-
-  private escapeHtml(value: string): string {
-    const element = document.createElement('div')
-    element.innerText = value ?? ''
-    return element.innerHTML
-  }
-
-  private loadBundles() {
-    this.documentBundleService
-      .listAll('bundle_id')
-      .pipe(first(), takeUntil(this.unsubscribeNotifier))
-      .subscribe({
-        next: (result) => (this.bundles = result.results),
-        error: (error) =>
-          this.toastService.showError($localize`Error loading bundles`, error),
-      })
-  }
-
   pdfPreviewLoaded(pdf: PngxPdfDocumentProxy) {
     this.previewNumPages = pdf.numPages
-    this.clearPreviewError()
     if (this.password) this.requiresPassword = false
     setTimeout(() => {
       this.previewLoaded = true
@@ -1868,11 +1514,8 @@ export class DocumentDetailComponent
   onError(event) {
     if (event.name == 'PasswordException') {
       this.requiresPassword = true
-      this.clearPreviewError()
-    } else {
-      this.setPreviewError(event)
+      this.previewLoaded = true
     }
-    this.previewLoaded = true
   }
 
   onPasswordKeyUp(event: KeyboardEvent) {

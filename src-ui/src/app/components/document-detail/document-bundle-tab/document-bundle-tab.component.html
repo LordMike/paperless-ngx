@@ -1,0 +1,136 @@
+<div class="mb-3">
+  <table class="table table-borderless align-middle mb-3">
+    <tbody>
+      <tr>
+        <td class="w-25" i18n>Bundle</td>
+        <td>
+          <div class="input-group">
+            <select
+              id="documentBundleSelect"
+              class="form-select"
+              [(ngModel)]="selectedBundleId"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onBundleSelectionChange($event)"
+              [disabled]="!userCanEdit"
+            >
+              <option [ngValue]="null" i18n>No bundle</option>
+              @for (bundle of bundles; track bundle.id) {
+                <option [ngValue]="bundle.id">
+                  {{ getBundleOptionLabel(bundle) }}
+                </option>
+              }
+            </select>
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              i18n-title
+              title="Create new bundle"
+              (click)="createBundleForCurrentDocument()"
+              [disabled]="!userCanEdit"
+            >
+              <i-bs name="plus"></i-bs>
+            </button>
+          </div>
+        </td>
+      </tr>
+      @if (document?.bundle) {
+        <tr>
+          <td i18n>Item name</td>
+          <td>
+            <input
+              id="documentBundleItemName"
+              class="form-control"
+              [(ngModel)]="bundleItemName"
+              [ngModelOptions]="{ standalone: true }"
+              [disabled]="!userCanEdit || bundleMembershipSaving"
+            />
+          </td>
+        </tr>
+        <tr>
+          <td i18n>Type</td>
+          <td>
+            <input
+              id="documentBundleItemType"
+              class="form-control"
+              [(ngModel)]="bundleItemType"
+              [ngModelOptions]="{ standalone: true }"
+              [disabled]="!userCanEdit || bundleMembershipSaving"
+              placeholder="cover letter"
+              i18n-placeholder
+            />
+          </td>
+        </tr>
+        <tr>
+          <td i18n>Added on</td>
+          <td>{{ document.bundle.current_membership_created | customDate }}</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="saveCurrentBundleMembership()"
+                [disabled]="
+                  !userCanEdit ||
+                  bundleMembershipSaving ||
+                  !bundleMembershipDirty
+                "
+              >
+                @if (bundleMembershipSaving) {
+                  <span
+                    class="spinner-border spinner-border-sm me-1"
+                    role="status"
+                  ></span>
+                }
+                <ng-container i18n>Save bundle changes</ng-container>
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                (click)="discardBundleMembershipChanges()"
+                [disabled]="
+                  !userCanEdit ||
+                  bundleMembershipSaving ||
+                  !bundleMembershipDirty
+                "
+                i18n
+              >
+                Discard
+              </button>
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+  @if (document?.bundle) {
+    <div class="table-responsive">
+      <table class="table table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th i18n>Name</th>
+            <th class="d-none d-sm-table-cell" i18n>Type</th>
+            <th i18n>Document</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of document.bundle.items; track item.membership_id) {
+            <tr [class.fw-semibold]="item.document === documentId">
+              <td>
+                <a [routerLink]="['/documents', item.document, 'details']">{{
+                  item.bundle_item_name
+                }}</a>
+              </td>
+              <td class="d-none d-sm-table-cell">
+                {{ item.bundle_item_type || '-' }}
+              </td>
+              <td>{{ item.title || item.document }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

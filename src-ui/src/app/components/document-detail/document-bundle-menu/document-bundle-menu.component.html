@@ -1,0 +1,32 @@
+@if (document?.bundle) {
+  <div class="btn-group" ngbDropdown role="group">
+    <button
+      class="btn btn-sm btn-outline-primary dropdown-toggle"
+      ngbDropdownToggle
+    >
+      <i-bs name="stack"></i-bs
+      ><span class="d-none d-lg-inline ps-1">{{
+        document.bundle.bundle_id
+      }}</span>
+    </button>
+    <div class="dropdown-menu shadow" ngbDropdownMenu>
+      @for (item of document.bundle.items; track item.membership_id) {
+        <a
+          ngbDropdownItem
+          [routerLink]="['/documents', item.document, 'details']"
+          [class.active]="item.document === documentId"
+        >
+          {{ item.bundle_item_name }}
+          @if (item.title && item.title !== item.bundle_item_name) {
+            <span
+              [class.text-muted]="item.document !== documentId"
+              [class.text-white-50]="item.document === documentId"
+            >
+              - {{ item.title }}</span
+            >
+          }
+        </a>
+      }
+    </div>
+  </div>
+}

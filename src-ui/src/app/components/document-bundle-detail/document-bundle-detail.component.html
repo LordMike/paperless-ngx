@@ -1,7 +1,15 @@
 <pngx-page-header [title]="bundle ? 'Bundle ' + bundle.bundle_id : 'Bundle'">
-  <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteBundle()" [disabled]="!bundle || deleting">
-    <i-bs name="trash" class="me-1"></i-bs><ng-container i18n>Delete bundle</ng-container>
-  </button>
+  @if (userCanEditBundles) {
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-danger"
+      (click)="deleteBundle()"
+      [disabled]="!bundle || deleting"
+    >
+      <i-bs name="trash" class="me-1"></i-bs
+      ><ng-container i18n>Delete bundle</ng-container>
+    </button>
+  }
 </pngx-page-header>
 
 @if (bundle) {
@@ -22,33 +30,67 @@
           <th></th>
         </tr>
       </thead>
-      <tbody cdkDropList (cdkDropListDropped)="drop($event)">
+      <tbody
+        cdkDropList
+        [cdkDropListDisabled]="!userCanEditBundles"
+        (cdkDropListDropped)="drop($event)"
+      >
         @for (item of bundle.items; track item.id) {
-          <tr cdkDrag>
+          <tr cdkDrag [cdkDragDisabled]="!userCanEditBundles">
             <td>
               <div class="d-flex align-items-center">
-                <button type="button" class="btn btn-link text-muted p-0 me-2 drag-handle" cdkDragHandle i18n-title title="Drag to reorder">
-                  <i-bs name="grip-vertical"></i-bs>
-                </button>
+                @if (userCanEditBundles) {
+                  <button
+                    type="button"
+                    class="btn btn-link text-muted p-0 me-2 drag-handle"
+                    cdkDragHandle
+                    i18n-title
+                    title="Drag to reorder"
+                  >
+                    <i-bs name="grip-vertical"></i-bs>
+                  </button>
+                }
                 <div>
-                  <a routerLink="/documents/{{item.document}}">{{item.bundle_item_name}}</a>
+                  <a routerLink="/documents/{{ item.document }}">{{
+                    item.bundle_item_name
+                  }}</a>
                   @if (item.bundle_item_type) {
-                    <div class="small text-muted">{{item.bundle_item_type}}</div>
+                    <div class="small text-muted">
+                      {{ item.bundle_item_type }}
+                    </div>
                   }
                 </div>
               </div>
             </td>
-            <td class="d-none d-sm-table-cell">{{item.created | customDate}}</td>
-            <td>{{item.document_title || item.document}}</td>
+            <td class="d-none d-sm-table-cell">
+              {{ item.created | customDate }}
+            </td>
+            <td>{{ item.document_title || item.document }}</td>
             <td class="text-end">
-              <div class="btn-group btn-group-sm">
-                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item" (click)="editItem(item)" [disabled]="removingMembership || deleting">
-                  <i-bs name="pencil"></i-bs>
-                </button>
-                <button type="button" class="btn btn-outline-danger" i18n-title title="Remove from bundle" (click)="remove(item)" [disabled]="removingMembership || deleting">
-                  <i-bs name="x"></i-bs>
-                </button>
-              </div>
+              @if (userCanEditBundles) {
+                <div class="btn-group btn-group-sm">
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    i18n-title
+                    title="Edit bundle item"
+                    (click)="editItem(item)"
+                    [disabled]="removingMembership || deleting"
+                  >
+                    <i-bs name="pencil"></i-bs>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger"
+                    i18n-title
+                    title="Remove from bundle"
+                    (click)="remove(item)"
+                    [disabled]="removingMembership || deleting"
+                  >
+                    <i-bs name="x"></i-bs>
+                  </button>
+                </div>
+              }
             </td>
           </tr>
         }

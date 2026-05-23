@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 BUNDLE_ID_MAX_LENGTH = 32
-BUNDLE_ID_ALLOWED_CHARS = set(string.ascii_uppercase + string.digits + "_-")
+BUNDLE_ID_ALLOWED_CHARS = set(string.ascii_uppercase + string.digits + "-")
 BUNDLE_ID_GENERATED_PREFIX = "BND-"
 BUNDLE_ID_GENERATED_BATCH_SIZE = 20
 BUNDLE_ID_GENERATED_SUFFIX_MIN_LENGTH = 3
@@ -41,7 +41,7 @@ def normalize_bundle_id(bundle_id: str) -> str:
         raise ValidationError("Bundle ID must be 32 characters or fewer.")
     if any(char not in BUNDLE_ID_ALLOWED_CHARS for char in normalized):
         raise ValidationError(
-            "Bundle ID may only contain A-Z, 0-9, underscores, and hyphens.",
+            "Bundle ID may only contain A-Z, 0-9, and hyphens.",
         )
     return normalized
 
@@ -276,6 +276,29 @@ def remove_document_from_all_bundles(document: Document) -> None:
     )
     for membership in memberships:
         remove_membership(membership)
+
+
+def create_bundle_from_task_results(
+    *,
+    task_results: list,
+    bundle_item_names: list[str],
+) -> DocumentBundle | None:
+    created_items = []
+    for task_result, bundle_item_name in zip(task_results, bundle_item_names):
+        if isinstance(task_result, dict) and task_result.get("document_id"):
+            try:
+                document = Document.objects.get(pk=task_result["document_id"])
+            except Document.DoesNotExist:
+                continue
+            created_items.append(
+                BundleItemInput(
+                    document=document,
+                    bundle_item_name=bundle_item_name,
+                ),
+            )
+    if len(created_items) <= 1:
+        return None
+    return create_bundle(items=created_items)
 
 
 def can_view_document(user, document: Document) -> bool:

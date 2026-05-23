@@ -49,7 +49,7 @@ class TestDocumentBundleModel(TestCase):
 
     def test_generate_bundle_id_ignores_invalid_generated_suffix(self):
         DocumentBundle.objects.create(bundle_id="BND-009")
-        DocumentBundle.objects.create(bundle_id="BND-__")
+        DocumentBundle.objects.create(bundle_id="BND-ABC-")
 
         self.assertEqual(generate_bundle_id(), "BND-00A")
 

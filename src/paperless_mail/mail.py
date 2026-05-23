@@ -261,25 +261,12 @@ def apply_mail_action(
 
     try:
         if rule.bundle_documents and bundle_item_names:
-            from documents.bundles import BundleItemInput
-            from documents.bundles import create_bundle
-            from documents.models import Document
+            from documents.bundles import create_bundle_from_task_results
 
-            created_items = []
-            for task_result, bundle_item_name in zip(result, bundle_item_names):
-                if isinstance(task_result, dict) and task_result.get("document_id"):
-                    try:
-                        document = Document.objects.get(pk=task_result["document_id"])
-                    except Document.DoesNotExist:
-                        continue
-                    created_items.append(
-                        BundleItemInput(
-                            document=document,
-                            bundle_item_name=bundle_item_name,
-                        ),
-                    )
-            if len(created_items) > 1:
-                create_bundle(items=created_items)
+            create_bundle_from_task_results(
+                task_results=result,
+                bundle_item_names=bundle_item_names,
+            )
 
         with get_mailbox(
             server=account.imap_server,
@@ -794,28 +781,12 @@ class MailAccountHandler(LoggingMixin):
                 consume_tasks.extend(attachment_tasks)
                 bundle_item_names.extend(attachment_names)
 
-            if consume_tasks:
-                queue_consumption_tasks(
-                    consume_tasks=consume_tasks,
-                    rule=rule,
-                    message=message,
-                    bundle_item_names=bundle_item_names,
-                )
-            elif not ProcessedMail.objects.filter(
+            self._queue_or_mark_processed(
+                consume_tasks=consume_tasks,
                 rule=rule,
-                uid=message.uid,
-                folder=rule.folder,
-            ).exists():
-                ProcessedMail.objects.create(
-                    rule=rule,
-                    folder=rule.folder,
-                    uid=message.uid,
-                    subject=message.subject,
-                    received=make_aware(message.date)
-                    if is_naive(message.date)
-                    else message.date,
-                    status="PROCESSED_WO_CONSUMPTION",
-                )
+                message=message,
+                bundle_item_names=bundle_item_names,
+            )
 
             return processed_elements
 
@@ -842,6 +813,46 @@ class MailAccountHandler(LoggingMixin):
             )
 
         return processed_elements
+
+    def _queue_or_mark_processed(
+        self,
+        *,
+        consume_tasks: list[Signature],
+        rule: MailRule,
+        message: MailMessage,
+        bundle_item_names: list[str] | None = None,
+    ) -> None:
+        if consume_tasks:
+            queue_consumption_tasks(
+                consume_tasks=consume_tasks,
+                rule=rule,
+                message=message,
+                bundle_item_names=bundle_item_names,
+            )
+        else:
+            self._mark_processed_without_consumption(rule, message)
+
+    def _mark_processed_without_consumption(
+        self,
+        rule: MailRule,
+        message: MailMessage,
+    ) -> None:
+        if ProcessedMail.objects.filter(
+            rule=rule,
+            uid=message.uid,
+            folder=rule.folder,
+        ).exists():
+            return
+        ProcessedMail.objects.create(
+            rule=rule,
+            folder=rule.folder,
+            uid=message.uid,
+            subject=message.subject,
+            received=make_aware(message.date)
+            if is_naive(message.date)
+            else message.date,
+            status="PROCESSED_WO_CONSUMPTION",
+        )
 
     def filename_inclusion_matches(
         self,
@@ -1005,29 +1016,11 @@ class MailAccountHandler(LoggingMixin):
         if not queue_tasks:
             return processed_attachments, consume_tasks, bundle_item_names
 
-        if len(consume_tasks) > 0:
-            queue_consumption_tasks(
-                consume_tasks=consume_tasks,
-                rule=rule,
-                message=message,
-            )
-        else:
-            # No files to consume, just mark as processed if it wasn't by .eml processing
-            if not ProcessedMail.objects.filter(
-                rule=rule,
-                uid=message.uid,
-                folder=rule.folder,
-            ).exists():
-                ProcessedMail.objects.create(
-                    rule=rule,
-                    folder=rule.folder,
-                    uid=message.uid,
-                    subject=message.subject,
-                    received=make_aware(message.date)
-                    if is_naive(message.date)
-                    else message.date,
-                    status="PROCESSED_WO_CONSUMPTION",
-                )
+        self._queue_or_mark_processed(
+            consume_tasks=consume_tasks,
+            rule=rule,
+            message=message,
+        )
 
         return processed_attachments
 

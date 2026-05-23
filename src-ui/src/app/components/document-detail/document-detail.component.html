@@ -34,27 +34,7 @@
     (versionsUpdated)="onVersionsUpdated($event)"
   />
 
-  @if (document?.bundle) {
-    <div class="btn-group" ngbDropdown role="group">
-      <button class="btn btn-sm btn-outline-primary dropdown-toggle" ngbDropdownToggle>
-        <i-bs name="stack"></i-bs><span class="d-none d-lg-inline ps-1">{{document.bundle.bundle_id}}</span>
-      </button>
-      <div class="dropdown-menu shadow" ngbDropdownMenu>
-        @for (item of document.bundle.items; track item.membership_id) {
-          <a
-            ngbDropdownItem
-            [routerLink]="['/documents', item.document, 'details']"
-            [class.active]="item.document === documentId"
-          >
-            {{item.bundle_item_name}}
-            @if (item.title && item.title !== item.bundle_item_name) {
-              <span [class.text-muted]="item.document !== documentId" [class.text-white-50]="item.document === documentId"> - {{item.title}}</span>
-            }
-          </a>
-        }
-      </div>
-    </div>
-  }
+  <pngx-document-bundle-menu [document]="document" [documentId]="documentId" />
 
   <div class="btn-group">
     <button (click)="download()" class="btn btn-sm btn-outline-primary" [disabled]="downloading">
@@ -379,84 +359,7 @@
             <span class="badge text-bg-secondary ms-1">1</span>
           }</a>
           <ng-template ngbNavContent>
-            <div class="mb-3">
-              <table class="table table-borderless align-middle mb-3">
-                <tbody>
-                  <tr>
-                    <td class="w-25" i18n>Bundle</td>
-                    <td>
-                      <div class="input-group">
-                        <select id="documentBundleSelect" class="form-select" [(ngModel)]="selectedBundleId" [ngModelOptions]="{standalone: true}" (ngModelChange)="onBundleSelectionChange($event)" [disabled]="!userCanEdit">
-                          <option [ngValue]="null" i18n>No bundle</option>
-                          @for (bundle of bundles; track bundle.id) {
-                            <option [ngValue]="bundle.id">{{getBundleOptionLabel(bundle)}}</option>
-                          }
-                        </select>
-                        <button type="button" class="btn btn-outline-secondary" i18n-title title="Create new bundle" (click)="createBundleForCurrentDocument()" [disabled]="!userCanEdit">
-                          <i-bs name="plus"></i-bs>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  @if (document?.bundle) {
-                    <tr>
-                      <td i18n>Item name</td>
-                      <td>
-                        <input id="documentBundleItemName" class="form-control" [(ngModel)]="bundleItemName" [ngModelOptions]="{standalone: true}" [disabled]="!userCanEdit || bundleMembershipSaving">
-                      </td>
-                    </tr>
-                    <tr>
-                      <td i18n>Type</td>
-                      <td>
-                        <input id="documentBundleItemType" class="form-control" [(ngModel)]="bundleItemType" [ngModelOptions]="{standalone: true}" [disabled]="!userCanEdit || bundleMembershipSaving" placeholder="cover letter" i18n-placeholder>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td i18n>Added on</td>
-                      <td>{{document.bundle.current_membership_created | customDate}}</td>
-                    </tr>
-                    <tr>
-                      <td></td>
-                      <td>
-                        <div class="btn-group btn-group-sm">
-                          <button type="button" class="btn btn-primary" (click)="saveCurrentBundleMembership()" [disabled]="!userCanEdit || bundleMembershipSaving || !bundleMembershipDirty">
-                            @if (bundleMembershipSaving) {
-                              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            <ng-container i18n>Save bundle changes</ng-container>
-                          </button>
-                          <button type="button" class="btn btn-outline-secondary" (click)="discardBundleMembershipChanges()" [disabled]="!userCanEdit || bundleMembershipSaving || !bundleMembershipDirty" i18n>Discard</button>
-                        </div>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-              @if (document?.bundle) {
-                <div class="table-responsive">
-                  <table class="table table-striped align-middle mb-0">
-                    <thead>
-                      <tr>
-                        <th i18n>Name</th>
-                        <th class="d-none d-sm-table-cell" i18n>Type</th>
-                        <th i18n>Document</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (item of document.bundle.items; track item.membership_id) {
-                        <tr [class.fw-semibold]="item.document === documentId">
-                          <td>
-                            <a [routerLink]="['/documents', item.document, 'details']">{{item.bundle_item_name}}</a>
-                          </td>
-                          <td class="d-none d-sm-table-cell">{{item.bundle_item_type || '-'}}</td>
-                          <td>{{item.title || item.document}}</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              }
-            </div>
+            <pngx-document-bundle-tab [document]="document" [documentId]="documentId" [userCanEdit]="userCanEdit" (bundleChanged)="onBundleChanged()" />
           </ng-template>
         </li>
 
@@ -575,65 +478,43 @@
     </div>
   </div>
   @if (document) {
-    @if (previewError) {
-      <div class="preview-sticky bg-light p-3">
-        <div class="alert alert-danger shadow-sm" role="alert">
-          <h5 class="alert-heading d-flex align-items-center">
-            <i-bs name="exclamation-triangle-fill" class="me-2"></i-bs>
-            {{previewError.title}}
-          </h5>
-          <p>{{previewError.message}}</p>
-          @if (previewError.status) {
-            <p class="mb-2"><span class="fw-semibold" i18n>HTTP status:</span> {{previewError.status}}</p>
-          }
-          <hr>
-          <p class="fw-semibold mb-2" i18n>What can I do?</p>
-          <ul class="mb-0">
-            @for (action of previewError.actions; track action) {
-              <li>{{action}}</li>
-            }
-          </ul>
-        </div>
-      </div>
-    } @else {
-      @switch (archiveContentRenderType) {
-        @case (ContentRenderType.PDF) {
-          @if (!useNativePdfViewer) {
-            <div class="preview-sticky pdf-viewer-container">
-              <pngx-pdf-viewer
-                [src]="pdfSource"
-                [renderMode]="PdfRenderMode.All"
-                [(page)]="previewCurrentPage"
-                [zoomScale]="previewZoomScale"
-                [zoom]="previewZoomSetting"
-                (loadError)="onError($event)"
-                (afterLoadComplete)="pdfPreviewLoaded($event)">
-              </pngx-pdf-viewer>
-            </div>
-          } @else {
-            <object [data]="previewUrl | safeUrl" class="preview-sticky" width="100%"></object>
-          }
-        }
-        @case (ContentRenderType.Text) {
-          <div class="preview-sticky bg-light p-3 overflow-auto whitespace-preserve" width="100%">{{previewText}}</div>
-        }
-        @case (ContentRenderType.Image) {
-          <div class="preview-sticky">
-            <img [src]="previewUrl" width="100%" height="100%" alt="{{title}}" />
+    @switch (archiveContentRenderType) {
+      @case (ContentRenderType.PDF) {
+        @if (!useNativePdfViewer) {
+          <div class="preview-sticky pdf-viewer-container">
+            <pngx-pdf-viewer
+              [src]="pdfSource"
+              [renderMode]="PdfRenderMode.All"
+              [(page)]="previewCurrentPage"
+              [zoomScale]="previewZoomScale"
+              [zoom]="previewZoomSetting"
+              (loadError)="onError($event)"
+              (afterLoadComplete)="pdfPreviewLoaded($event)">
+            </pngx-pdf-viewer>
           </div>
-        }
-        @case (ContentRenderType.TIFF) {
-          @if (!tiffError) {
-            <div class="preview-sticky">
-              <img [src]="tiffURL" width="100%" height="100%" alt="{{title}}" />
-            </div>
-          } @else {
-            <div class="preview-sticky bg-light p-3 overflow-auto whitespace-preserve" width="100%">{{tiffError}}</div>
-          }
-        }
-        @case (ContentRenderType.Other) {
+        } @else {
           <object [data]="previewUrl | safeUrl" class="preview-sticky" width="100%"></object>
         }
+      }
+      @case (ContentRenderType.Text) {
+        <div class="preview-sticky bg-light p-3 overflow-auto whitespace-preserve" width="100%">{{previewText}}</div>
+      }
+      @case (ContentRenderType.Image) {
+        <div class="preview-sticky">
+          <img [src]="previewUrl" width="100%" height="100%" alt="{{title}}" />
+        </div>
+      }
+      @case (ContentRenderType.TIFF) {
+        @if (!tiffError) {
+          <div class="preview-sticky">
+            <img [src]="tiffURL" width="100%" height="100%" alt="{{title}}" />
+          </div>
+        } @else {
+          <div class="preview-sticky bg-light p-3 overflow-auto whitespace-preserve" width="100%">{{tiffError}}</div>
+        }
+      }
+      @case (ContentRenderType.Other) {
+        <object [data]="previewUrl | safeUrl" class="preview-sticky" width="100%"></object>
       }
     }
     @if (requiresPassword) {

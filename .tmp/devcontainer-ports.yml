@@ -1,5 +1,0 @@
-services:
-  paperless-development:
-    ports:
-      - "8000:8000"
-      - "4200:4200"

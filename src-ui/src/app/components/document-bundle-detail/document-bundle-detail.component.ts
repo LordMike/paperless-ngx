@@ -12,6 +12,11 @@ import {
   DocumentBundleItem,
 } from 'src/app/data/document-bundle'
 import { CustomDatePipe } from 'src/app/pipes/custom-date.pipe'
+import {
+  PermissionAction,
+  PermissionsService,
+  PermissionType,
+} from 'src/app/services/permissions.service'
 import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { ToastService } from 'src/app/services/toast.service'
 import { ConfirmDialogComponent } from '../common/confirm-dialog/confirm-dialog.component'
@@ -36,11 +41,19 @@ export class DocumentBundleDetailComponent implements OnInit {
   private readonly bundleService = inject(DocumentBundleService)
   private readonly toastService = inject(ToastService)
   private readonly modalService = inject(NgbModal)
+  private readonly permissionsService = inject(PermissionsService)
 
   bundle: DocumentBundle
   orderSaving = false
   deleting = false
   removingMembership = false
+
+  get userCanEditBundles(): boolean {
+    return this.permissionsService.currentUserCan(
+      PermissionAction.Change,
+      PermissionType.Document
+    )
+  }
 
   ngOnInit(): void {
     this.load()
@@ -58,6 +71,7 @@ export class DocumentBundleDetailComponent implements OnInit {
   }
 
   editItem(item: DocumentBundleItem) {
+    if (!this.userCanEditBundles) return
     const modal = this.modalService.open(
       DocumentBundleItemEditDialogComponent,
       {
@@ -96,6 +110,7 @@ export class DocumentBundleDetailComponent implements OnInit {
   }
 
   remove(item: DocumentBundleItem) {
+    if (!this.userCanEditBundles) return
     const modal = this.modalService.open(ConfirmDialogComponent, {
       backdrop: 'static',
     })
@@ -128,7 +143,11 @@ export class DocumentBundleDetailComponent implements OnInit {
   }
 
   drop(event: CdkDragDrop<DocumentBundleItem[]>) {
-    if (!this.bundle?.items || event.previousIndex === event.currentIndex) {
+    if (
+      !this.userCanEditBundles ||
+      !this.bundle?.items ||
+      event.previousIndex === event.currentIndex
+    ) {
       return
     }
     moveItemInArray(this.bundle.items, event.previousIndex, event.currentIndex)
@@ -151,6 +170,7 @@ export class DocumentBundleDetailComponent implements OnInit {
   }
 
   deleteBundle() {
+    if (!this.userCanEditBundles) return
     const modal = this.modalService.open(ConfirmDialogComponent, {
       backdrop: 'static',
     })

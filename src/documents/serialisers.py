@@ -25,7 +25,6 @@ from django.core.validators import MinValueValidator
 from django.core.validators import RegexValidator
 from django.core.validators import integer_validator
 from django.db.models import Count
-from django.db.models import Prefetch
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils import timezone
@@ -55,14 +54,15 @@ if settings.AUDIT_LOG_ENABLED:
 
 
 from documents import bulk_edit
+from documents.bundle_api import DocumentBundleSummarySerializer
+from documents.bundle_api import bundle_membership_prefetch
+from documents.bundle_api import serialize_document_bundle
 from documents.data_models import DocumentSource
 from documents.filters import CustomFieldQueryParser
 from documents.models import Correspondent
 from documents.models import CustomField
 from documents.models import CustomFieldInstance
 from documents.models import Document
-from documents.models import DocumentBundle
-from documents.models import DocumentBundleMembership
 from documents.models import DocumentType
 from documents.models import MatchingModel
 from documents.models import Note
@@ -970,229 +970,6 @@ class DuplicateDocumentSummarySerializer(serializers.Serializer[dict[str, Any]])
     deleted_at = serializers.DateTimeField(allow_null=True)
 
 
-class DocumentBundleItemSummarySerializer(serializers.Serializer[dict[str, Any]]):
-    membership_id = serializers.IntegerField()
-    document = serializers.IntegerField()
-    order_id = serializers.IntegerField()
-    bundle_item_name = serializers.CharField()
-    bundle_item_type = serializers.CharField()
-    created = serializers.DateTimeField()
-    title = serializers.CharField(allow_blank=True)
-
-
-class DocumentBundleSummarySerializer(serializers.Serializer[dict[str, Any]]):
-    id = serializers.IntegerField()
-    name = serializers.CharField(allow_blank=True)
-    bundle_id = serializers.CharField()
-    current_membership_id = serializers.IntegerField()
-    current_order_id = serializers.IntegerField()
-    current_bundle_item_name = serializers.CharField()
-    current_bundle_item_type = serializers.CharField()
-    current_membership_created = serializers.DateTimeField()
-    items = DocumentBundleItemSummarySerializer(many=True)
-
-
-class DocumentBundleMembershipSerializer(serializers.ModelSerializer):
-    document_title = serializers.CharField(source="document.title", read_only=True)
-
-    class Meta:
-        model = DocumentBundleMembership
-        fields = (
-            "id",
-            "document",
-            "document_title",
-            "order_id",
-            "bundle_item_name",
-            "bundle_item_type",
-            "created",
-        )
-        read_only_fields = ("id", "order_id", "created", "document_title")
-
-
-class DocumentBundleCreateItemSerializer(serializers.Serializer):
-    document = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
-    bundle_item_name = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=256,
-    )
-    bundle_item_type = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=128,
-    )
-
-
-class DocumentBundleSerializer(serializers.ModelSerializer):
-    document_count = serializers.IntegerField(read_only=True)
-    items = DocumentBundleMembershipSerializer(
-        source="memberships",
-        many=True,
-        read_only=True,
-    )
-    documents = serializers.PrimaryKeyRelatedField(
-        queryset=Document.objects.all(),
-        many=True,
-        write_only=True,
-        required=False,
-    )
-    create_items = DocumentBundleCreateItemSerializer(
-        many=True,
-        write_only=True,
-        required=False,
-    )
-
-    class Meta:
-        model = DocumentBundle
-        fields = (
-            "id",
-            "name",
-            "bundle_id",
-            "created",
-            "document_count",
-            "items",
-            "documents",
-            "create_items",
-        )
-        read_only_fields = ("id", "created", "document_count", "items")
-        extra_kwargs = {"bundle_id": {"required": False}}
-
-    def validate_bundle_id(self, value):
-        from documents.bundles import normalize_bundle_id
-
-        return normalize_bundle_id(value)
-
-    def validate(self, attrs):
-        if (
-            self.instance is None
-            and not attrs.get("documents")
-            and not attrs.get(
-                "create_items",
-            )
-        ):
-            raise serializers.ValidationError(
-                {"documents": "A bundle must contain at least one document."},
-            )
-        return attrs
-
-    def create(self, validated_data):
-        from documents.bundles import BundleItemInput
-        from documents.bundles import create_bundle
-
-        documents = validated_data.pop("documents", None)
-        create_items = validated_data.pop("create_items", None)
-        bundle_id = validated_data.get("bundle_id")
-        name = validated_data.get("name")
-
-        if create_items:
-            items = [
-                BundleItemInput(
-                    document=item["document"],
-                    bundle_item_name=item.get("bundle_item_name"),
-                    bundle_item_type=item.get("bundle_item_type"),
-                )
-                for item in create_items
-            ]
-        else:
-            items = [BundleItemInput(document=document) for document in documents]
-
-        try:
-            return create_bundle(items=items, bundle_id=bundle_id, name=name)
-        except ValidationError as e:
-            raise serializers.ValidationError(e.messages)
-
-    def update(self, instance, validated_data):
-        update_fields = []
-        if "name" in validated_data:
-            instance.name = validated_data["name"]
-            update_fields.append("name")
-        bundle_id = validated_data.get("bundle_id")
-        if bundle_id is not None:
-            instance.bundle_id = bundle_id
-            update_fields.append("bundle_id")
-        if update_fields:
-            instance.save(update_fields=update_fields)
-        return instance
-
-
-class DocumentBundleAddDocumentSerializer(serializers.Serializer):
-    document = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
-    bundle_item_name = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=256,
-    )
-    bundle_item_type = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=128,
-    )
-
-
-class DocumentBundleCreateForDocumentSerializer(serializers.Serializer):
-    document = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
-    name = serializers.CharField(required=False, allow_blank=True, max_length=128)
-    bundle_id = serializers.CharField(required=False, allow_blank=True, max_length=32)
-    bundle_item_name = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=256,
-    )
-    bundle_item_type = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=128,
-    )
-
-    def validate_bundle_id(self, value):
-        if not value:
-            return value
-        from documents.bundles import normalize_bundle_id
-
-        normalized = normalize_bundle_id(value)
-        if DocumentBundle.objects.filter(bundle_id=normalized).exists():
-            raise serializers.ValidationError(
-                "Document bundle with this bundle ID already exists.",
-            )
-        return normalized
-
-
-class DocumentBundleMoveDocumentSerializer(serializers.Serializer):
-    membership = serializers.PrimaryKeyRelatedField(
-        queryset=DocumentBundleMembership.objects.select_related("document", "bundle"),
-    )
-    bundle_item_name = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=256,
-    )
-    bundle_item_type = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=128,
-    )
-
-
-class DocumentBundleMembershipUpdateSerializer(serializers.Serializer):
-    bundle_item_name = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=256,
-    )
-    bundle_item_type = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=128,
-    )
-
-
-class DocumentBundleReorderSerializer(serializers.Serializer):
-    membership_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        allow_empty=False,
-    )
-
-
 class _DocumentVersionInfo(TypedDict):
     id: int
     added: datetime
@@ -1259,54 +1036,9 @@ class DocumentSerializer(
 
     @extend_schema_field(DocumentBundleSummarySerializer(allow_null=True))
     def get_bundle(self, obj):
-        from documents.bundles import can_view_document
-
-        prefetched_cache = getattr(obj, "_prefetched_objects_cache", None)
-        prefetched_memberships = (
-            prefetched_cache.get("bundle_memberships")
-            if isinstance(prefetched_cache, dict)
-            else None
-        )
-        if prefetched_memberships is not None:
-            memberships = list(prefetched_memberships)
-        else:
-            memberships = list(
-                obj.bundle_memberships.select_related("bundle").all()[:1],
-            )
-        if not memberships:
-            return None
-
-        membership = memberships[0]
-        bundle = membership.bundle
         request = self.context.get("request")
         user = request.user if request else None
-        bundle_memberships = bundle.memberships.select_related("document").order_by(
-            "order_id",
-        )
-        items = [
-            {
-                "membership_id": item.id,
-                "document": item.document_id,
-                "order_id": item.order_id,
-                "bundle_item_name": item.bundle_item_name,
-                "bundle_item_type": item.bundle_item_type,
-                "created": item.created,
-                "title": item.document.title,
-            }
-            for item in bundle_memberships
-            if user is None or can_view_document(user, item.document)
-        ]
-        return {
-            "id": bundle.id,
-            "name": bundle.name,
-            "bundle_id": bundle.bundle_id,
-            "current_membership_id": membership.id,
-            "current_order_id": membership.order_id,
-            "current_bundle_item_name": membership.bundle_item_name,
-            "current_bundle_item_type": membership.bundle_item_type,
-            "current_membership_created": membership.created,
-            "items": items,
-        }
+        return serialize_document_bundle(obj, user)
 
     @extend_schema_field(DuplicateDocumentSummarySerializer(many=True))
     def get_duplicate_documents(self, obj):
@@ -1569,10 +1301,7 @@ class SearchResultSerializer(DocumentSerializer):
                 "tags",
                 "custom_fields",
                 "notes",
-                Prefetch(
-                    "bundle_memberships",
-                    queryset=DocumentBundleMembership.objects.select_related("bundle"),
-                ),
+                bundle_membership_prefetch(),
             )
             .filter(id__in=ids)
         }

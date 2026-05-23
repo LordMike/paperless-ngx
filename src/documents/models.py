@@ -534,9 +534,9 @@ class DocumentBundle(models.Model):
         db_index=True,
         validators=[
             RegexValidator(
-                regex=r"^[A-Z0-9_-]+$",
+                regex=r"^[A-Z0-9-]+$",
                 message=_(
-                    "Bundle IDs may only contain A-Z, 0-9, underscores, and hyphens.",
+                    "Bundle IDs may only contain A-Z, 0-9, and hyphens.",
                 ),
             ),
         ],

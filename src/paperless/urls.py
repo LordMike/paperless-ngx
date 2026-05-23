@@ -15,6 +15,7 @@ from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
+from documents.bundle_api import DocumentBundleViewSet
 from documents.views import BulkDownloadView
 from documents.views import BulkEditObjectsView
 from documents.views import BulkEditView
@@ -22,7 +23,6 @@ from documents.views import ChatStreamingView
 from documents.views import CorrespondentViewSet
 from documents.views import CustomFieldViewSet
 from documents.views import DeleteDocumentsView
-from documents.views import DocumentBundleViewSet
 from documents.views import DocumentTypeViewSet
 from documents.views import EditPdfDocumentsView
 from documents.views import GlobalSearchView
