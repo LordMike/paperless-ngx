@@ -44,6 +44,7 @@ from documents.models import Correspondent
 from documents.models import CustomField
 from documents.models import CustomFieldInstance
 from documents.models import Document
+from documents.models import DocumentBundle
 from documents.models import DocumentType
 from documents.models import PaperlessTask
 from documents.models import ShareLink
@@ -126,6 +127,21 @@ class StoragePathFilterSet(FilterSet):
             "id": ID_KWARGS,
             "name": CHAR_KWARGS,
             "path": CHAR_KWARGS,
+        }
+
+
+class DocumentBundleFilterSet(FilterSet):
+    bundle_id__icontains = CharFilter(
+        field_name="bundle_id",
+        lookup_expr="icontains",
+    )
+
+    class Meta:
+        model = DocumentBundle
+        fields = {
+            "id": ID_KWARGS,
+            "bundle_id": CHAR_KWARGS,
+            "created": DATETIME_KWARGS,
         }
 
 

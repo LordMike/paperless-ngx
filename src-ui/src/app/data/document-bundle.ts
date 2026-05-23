@@ -12,6 +12,7 @@ export interface DocumentBundleItem extends ObjectWithId {
 export interface DocumentBundle extends ObjectWithId {
   bundle_id?: string
   created?: string
+  document_count?: number
   items?: DocumentBundleItem[]
   documents?: number[]
   create_items?: {

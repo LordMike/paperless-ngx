@@ -132,6 +132,7 @@ from documents.data_models import DocumentSource
 from documents.file_handling import format_filename
 from documents.filters import CorrespondentFilterSet
 from documents.filters import CustomFieldFilterSet
+from documents.filters import DocumentBundleFilterSet
 from documents.filters import DocumentFilterSet
 from documents.filters import DocumentsOrderingFilter
 from documents.filters import DocumentTypeFilterSet
@@ -534,6 +535,12 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
     serializer_class = DocumentBundleSerializer
     pagination_class = StandardPagination
     permission_classes = (IsAuthenticated,)
+    filter_backends = (
+        DjangoFilterBackend,
+        OrderingFilter,
+    )
+    filterset_class = DocumentBundleFilterSet
+    ordering_fields = ("bundle_id", "created", "document_count")
 
     def get_queryset(self):
         from documents.bundles import visible_documents_queryset
@@ -544,6 +551,13 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
         ).select_related("document")
         return (
             DocumentBundle.objects.filter(memberships__document__in=visible_documents)
+            .annotate(
+                document_count=Count(
+                    "memberships",
+                    filter=Q(memberships__document__in=visible_documents),
+                    distinct=True,
+                ),
+            )
             .distinct()
             .prefetch_related(
                 Prefetch(

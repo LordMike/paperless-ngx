@@ -219,6 +219,10 @@ export class AppFrameComponent
       this.permissionsService.currentUserCan(
         PermissionAction.View,
         PermissionType.CustomField
+      ) ||
+      this.permissionsService.currentUserCan(
+        PermissionAction.View,
+        PermissionType.Document
       )
     )
   }

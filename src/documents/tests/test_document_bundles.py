@@ -139,6 +139,15 @@ class TestDocumentBundleAPI(APITestCase):
         self.assertEqual(response.data["count"], 3)
         self.assertIn("bundle", response.data["results"][0])
 
+        bundles = self.client.get(
+            "/api/bundles/",
+            {"bundle_id__icontains": "A8", "ordering": "-created"},
+        )
+        self.assertEqual(bundles.status_code, status.HTTP_200_OK)
+        self.assertEqual(bundles.data["count"], 1)
+        self.assertEqual(bundles.data["results"][0]["bundle_id"], "A87")
+        self.assertEqual(bundles.data["results"][0]["document_count"], 3)
+
     def test_bundle_api_returns_ordered_members_and_rejects_duplicate_document(self):
         docs = [DocumentFactory(title="A"), DocumentFactory(title="B")]
 

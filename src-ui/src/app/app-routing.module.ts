@@ -131,6 +131,7 @@ export const routes: Routes = [
             },
             { action: PermissionAction.View, type: PermissionType.StoragePath },
             { action: PermissionAction.View, type: PermissionType.CustomField },
+            { action: PermissionAction.View, type: PermissionType.Document },
           ],
           componentName: 'DocumentAttributesComponent',
         },
@@ -152,6 +153,7 @@ export const routes: Routes = [
             },
             { action: PermissionAction.View, type: PermissionType.StoragePath },
             { action: PermissionAction.View, type: PermissionType.CustomField },
+            { action: PermissionAction.View, type: PermissionType.Document },
           ],
           componentName: 'DocumentAttributesComponent',
         },
@@ -184,6 +186,11 @@ export const routes: Routes = [
       {
         path: 'storagepaths',
         redirectTo: '/attributes/storagepaths',
+        pathMatch: 'full',
+      },
+      {
+        path: 'bundles',
+        redirectTo: '/attributes/bundles',
         pathMatch: 'full',
       },
       {

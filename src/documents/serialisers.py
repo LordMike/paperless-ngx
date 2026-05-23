@@ -1023,6 +1023,7 @@ class DocumentBundleCreateItemSerializer(serializers.Serializer):
 
 
 class DocumentBundleSerializer(serializers.ModelSerializer):
+    document_count = serializers.IntegerField(read_only=True)
     items = DocumentBundleMembershipSerializer(
         source="memberships",
         many=True,
@@ -1042,8 +1043,16 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DocumentBundle
-        fields = ("id", "bundle_id", "created", "items", "documents", "create_items")
-        read_only_fields = ("id", "created", "items")
+        fields = (
+            "id",
+            "bundle_id",
+            "created",
+            "document_count",
+            "items",
+            "documents",
+            "create_items",
+        )
+        read_only_fields = ("id", "created", "document_count", "items")
         extra_kwargs = {"bundle_id": {"required": False}}
 
     def validate_bundle_id(self, value):

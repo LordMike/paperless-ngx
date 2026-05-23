@@ -26,6 +26,7 @@ import {
 import { ClearableBadgeComponent } from '../../common/clearable-badge/clearable-badge.component'
 import { PageHeaderComponent } from '../../common/page-header/page-header.component'
 import { CustomFieldsComponent } from './custom-fields/custom-fields.component'
+import { DocumentBundleListComponent } from './document-bundle-list/document-bundle-list.component'
 import { CorrespondentListComponent } from './management-list/correspondent-list/correspondent-list.component'
 import { DocumentTypeListComponent } from './management-list/document-type-list/document-type-list.component'
 import { ManagementListComponent } from './management-list/management-list.component'
@@ -38,11 +39,13 @@ enum DocumentAttributesNavIDs {
   DocumentTypes = 3,
   StoragePaths = 4,
   CustomFields = 5,
+  Bundles = 6,
 }
 
 export enum DocumentAttributesSectionKind {
   ManagementList = 'managementList',
   CustomFields = 'customFields',
+  Standalone = 'standalone',
 }
 
 interface DocumentAttributesSection {
@@ -132,6 +135,15 @@ export class DocumentAttributesComponent
       permissionType: PermissionType.CustomField,
       kind: DocumentAttributesSectionKind.CustomFields,
       component: CustomFieldsComponent,
+    },
+    {
+      id: DocumentAttributesNavIDs.Bundles,
+      path: 'bundles',
+      label: $localize`Bundles`,
+      icon: 'stack',
+      permissionType: PermissionType.Document,
+      kind: DocumentAttributesSectionKind.Standalone,
+      component: DocumentBundleListComponent,
     },
   ]
 
