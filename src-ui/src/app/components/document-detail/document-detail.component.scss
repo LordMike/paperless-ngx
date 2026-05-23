@@ -67,7 +67,7 @@ textarea.rtl {
   overflow: hidden;
   background-color: gray;
   padding: 10px 8px; // border
-  z-index: 1000;
+  z-index: 1;
 
   @media screen and (min-width: 768px) {
     left: calc(.5 * var(--bs-gutter-x));

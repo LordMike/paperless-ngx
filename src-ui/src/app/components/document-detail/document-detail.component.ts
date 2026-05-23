@@ -1766,8 +1766,8 @@ export class DocumentDetailComponent
   onError(event) {
     if (event.name == 'PasswordException') {
       this.requiresPassword = true
-      this.previewLoaded = true
     }
+    this.previewLoaded = true
   }
 
   onPasswordKeyUp(event: KeyboardEvent) {

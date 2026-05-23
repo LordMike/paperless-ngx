@@ -1032,6 +1032,14 @@ describe('DocumentDetailComponent', () => {
     expect(component.previewNumPages).toEqual(1000)
   })
 
+  it('should clear loading preview on pdf load errors', () => {
+    initNormally()
+    component.previewLoaded = false
+    component.onError({ name: 'MissingPDFException' })
+    expect(component.previewLoaded).toBeTruthy()
+    expect(component.requiresPassword).toBeFalsy()
+  })
+
   it('should include delay of 300ms after previewloaded before showing pdf', fakeAsync(() => {
     initNormally()
     expect(component.previewLoaded).toBeFalsy()
