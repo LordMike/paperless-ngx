@@ -1040,6 +1040,53 @@ describe('DocumentDetailComponent', () => {
     expect(component.requiresPassword).toBeFalsy()
   })
 
+  it('should show missing preview guidance on pdf 404 errors', () => {
+    initNormally()
+    component.previewLoaded = false
+    component.onError({ name: 'MissingPDFException', status: 404 })
+    fixture.detectChanges()
+
+    expect(component.previewLoaded).toBeTruthy()
+    expect(component.previewError.title).toEqual('Preview file not found')
+    expect(component.previewError.status).toEqual(404)
+    expect(fixture.nativeElement.textContent).toContain(
+      'The document record exists, but the file used for preview is missing or unavailable.'
+    )
+    expect(fixture.nativeElement.textContent).toContain('What can I do?')
+    expect(fixture.nativeElement.textContent).toContain(
+      'document_sanity_checker'
+    )
+  })
+
+  it('should show access denied guidance on pdf 403 errors', () => {
+    initNormally()
+    component.onError({ name: 'UnexpectedResponseException', status: 403 })
+    fixture.detectChanges()
+
+    expect(component.previewError.title).toEqual('Preview access denied')
+    expect(component.previewError.status).toEqual(403)
+    expect(fixture.nativeElement.textContent).toContain(
+      'Paperless refused access to the preview file for this document.'
+    )
+    expect(fixture.nativeElement.textContent).toContain('What can I do?')
+  })
+
+  it('should show generic guidance on other pdf preview errors', () => {
+    initNormally()
+    component.onError({
+      name: 'UnexpectedResponseException',
+      message: 'Unexpected server response (500) while retrieving PDF.',
+    })
+    fixture.detectChanges()
+
+    expect(component.previewError.title).toEqual('Unable to load preview')
+    expect(component.previewError.status).toEqual(500)
+    expect(fixture.nativeElement.textContent).toContain(
+      'The preview request failed with HTTP status 500.'
+    )
+    expect(fixture.nativeElement.textContent).toContain('What can I do?')
+  })
+
   it('should include delay of 300ms after previewloaded before showing pdf', fakeAsync(() => {
     initNormally()
     expect(component.previewLoaded).toBeFalsy()

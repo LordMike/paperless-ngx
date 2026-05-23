@@ -160,6 +160,13 @@ interface IncomingDocumentUpdate {
   modified: string
 }
 
+interface PreviewError {
+  title: string
+  message: string
+  status?: number
+  actions: string[]
+}
+
 @Component({
   selector: 'pngx-document-detail',
   templateUrl: './document-detail.component.html',
@@ -254,6 +261,7 @@ export class DocumentDetailComponent
   thumbUrl: string
   previewText: string
   previewLoaded: boolean = false
+  previewError: PreviewError | null = null
   tiffURL: string
   tiffError: string
 
@@ -390,6 +398,67 @@ export class DocumentDetailComponent
     this.pdfSource = {
       url: this.previewUrl,
       password: this.password,
+    }
+  }
+
+  private clearPreviewError() {
+    this.previewError = null
+  }
+
+  private getPreviewErrorStatus(event: any): number | null {
+    const status = event?.status ?? event?.response?.status
+    if (typeof status === 'number') {
+      return status
+    }
+    if (typeof event?.message === 'string') {
+      const match = event.message.match(/\b(4\d\d|5\d\d)\b/)
+      if (match) {
+        return Number(match[1])
+      }
+    }
+    return null
+  }
+
+  private setPreviewError(event: any) {
+    const status = this.getPreviewErrorStatus(event)
+    if (status === 404) {
+      this.previewError = {
+        title: $localize`Preview file not found`,
+        message: $localize`The document record exists, but the file used for preview is missing or unavailable.`,
+        status,
+        actions: [
+          $localize`Run the sanity checker from System Status or with the document_sanity_checker management command to find missing or inaccessible files.`,
+          $localize`Check that the document storage volume is mounted and that Paperless can read the original and archive files.`,
+          $localize`Restore the missing file from backup or re-consume the document if the file was removed.`,
+        ],
+      }
+      return
+    }
+    if (status === 403) {
+      this.previewError = {
+        title: $localize`Preview access denied`,
+        message: $localize`Paperless refused access to the preview file for this document.`,
+        status,
+        actions: [
+          $localize`Refresh the page and confirm that your user still has permission to view this document.`,
+          $localize`Ask an administrator to check document ownership, permissions, and storage access.`,
+          $localize`Run the sanity checker if permissions look correct but the file still cannot be accessed.`,
+        ],
+      }
+      return
+    }
+    this.previewError = {
+      title: $localize`Unable to load preview`,
+      message:
+        status != null
+          ? $localize`The preview request failed with HTTP status ${status}.`
+          : $localize`The preview request failed before the document could be displayed.`,
+      status: status ?? undefined,
+      actions: [
+        $localize`Try again later or refresh the page in case this was a temporary server or network problem.`,
+        $localize`Check System Status and task logs for server errors.`,
+        $localize`Run the sanity checker from System Status or with the document_sanity_checker management command to verify document files and thumbnails.`,
+      ],
     }
   }
 
@@ -892,6 +961,7 @@ export class DocumentDetailComponent
       ? Math.max(...versions.map((version) => version.id))
       : doc.id
     this.previewLoaded = false
+    this.clearPreviewError()
     this.requiresPassword = false
     this.updateFormForCustomFields()
     this.loadMetadataForSelectedVersion()
@@ -933,6 +1003,7 @@ export class DocumentDetailComponent
   selectVersion(versionId: number) {
     this.selectedVersionId = versionId
     this.previewLoaded = false
+    this.clearPreviewError()
     this.previewUrl = this.documentsService.getPreviewUrl(
       this.documentId,
       false,
@@ -1757,6 +1828,7 @@ export class DocumentDetailComponent
 
   pdfPreviewLoaded(pdf: PngxPdfDocumentProxy) {
     this.previewNumPages = pdf.numPages
+    this.clearPreviewError()
     if (this.password) this.requiresPassword = false
     setTimeout(() => {
       this.previewLoaded = true
@@ -1766,6 +1838,9 @@ export class DocumentDetailComponent
   onError(event) {
     if (event.name == 'PasswordException') {
       this.requiresPassword = true
+      this.clearPreviewError()
+    } else {
+      this.setPreviewError(event)
     }
     this.previewLoaded = true
   }
