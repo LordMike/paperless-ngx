@@ -38,7 +38,10 @@ import { CustomField, CustomFieldDataType } from 'src/app/data/custom-field'
 import { CustomFieldInstance } from 'src/app/data/custom-field-instance'
 import { DataType } from 'src/app/data/datatype'
 import { Document, DocumentVersionInfo } from 'src/app/data/document'
-import { DocumentBundleDocumentSummary } from 'src/app/data/document-bundle'
+import {
+  DocumentBundle,
+  DocumentBundleDocumentSummary,
+} from 'src/app/data/document-bundle'
 import { DocumentMetadata } from 'src/app/data/document-metadata'
 import { DocumentNote } from 'src/app/data/document-note'
 import { DocumentSuggestions } from 'src/app/data/document-suggestions'
@@ -124,6 +127,7 @@ import {
 } from '../common/pdf-viewer/pdf-viewer.types'
 import { ShareLinksDialogComponent } from '../common/share-links-dialog/share-links-dialog.component'
 import { SuggestionsDropdownComponent } from '../common/suggestions-dropdown/suggestions-dropdown.component'
+import { DocumentBundleItemEditDialogComponent } from '../document-bundle-item-edit-dialog/document-bundle-item-edit-dialog.component'
 import { DocumentNotesComponent } from '../document-notes/document-notes.component'
 import { ComponentWithPermissions } from '../with-permissions/with-permissions.component'
 import { DocumentHistoryComponent } from './document-history/document-history.component'
@@ -134,11 +138,12 @@ enum DocumentDetailNavIDs {
   Details = 1,
   Content = 2,
   Metadata = 3,
-  Preview = 4,
-  Notes = 5,
-  Permissions = 6,
-  History = 7,
-  Duplicates = 8,
+  Bundle = 4,
+  Preview = 5,
+  Notes = 6,
+  Permissions = 7,
+  History = 8,
+  Duplicates = 9,
 }
 
 enum ContentRenderType {
@@ -258,6 +263,8 @@ export class DocumentDetailComponent
   correspondents: Correspondent[]
   documentTypes: DocumentType[]
   storagePaths: StoragePath[]
+  bundles: DocumentBundle[] = []
+  selectedBundleId: number
 
   documentForm: FormGroup = new FormGroup({
     title: new FormControl(''),
@@ -753,6 +760,14 @@ export class DocumentDetailComponent
     if (
       this.permissionsService.currentUserCan(
         PermissionAction.View,
+        PermissionType.Document
+      )
+    ) {
+      this.loadBundles()
+    }
+    if (
+      this.permissionsService.currentUserCan(
+        PermissionAction.View,
         PermissionType.User
       )
     ) {
@@ -897,11 +912,15 @@ export class DocumentDetailComponent
     }
     this.title = this.documentTitlePipe.transform(doc.title)
     this.prepareForm(doc)
+    this.selectedBundleId = doc.bundle?.id ?? null
 
     if (
       this.activeNavID === DocumentDetailNavIDs.Duplicates &&
       !doc?.duplicate_documents?.length
     ) {
+      this.activeNavID = DocumentDetailNavIDs.Details
+    }
+    if (this.activeNavID === DocumentDetailNavIDs.Bundle && !doc) {
       this.activeNavID = DocumentDetailNavIDs.Details
     }
   }
@@ -1511,25 +1530,52 @@ export class DocumentDetailComponent
     this.router.navigate(['documents', item.document])
   }
 
-  editBundleItemName() {
+  editCurrentBundleMembership() {
     if (!this.document?.bundle) return
-    const name = window.prompt(
-      $localize`Bundle item name`,
-      this.document.bundle.current_bundle_item_name
+    const modal = this.modalService.open(
+      DocumentBundleItemEditDialogComponent,
+      {
+        backdrop: 'static',
+      }
     )
-    if (name === null) return
-    this.documentBundleService
-      .updateMembership(
-        this.document.bundle.id,
-        this.document.bundle.current_membership_id,
-        name
-      )
-      .pipe(first())
-      .subscribe({
-        next: () => this.reloadRemoteVersion(),
-        error: (error) =>
-          this.toastService.showError($localize`Error updating bundle`, error),
-      })
+    modal.componentInstance.item = {
+      id: this.document.bundle.current_membership_id,
+      document: this.documentId,
+      document_title: this.document.title,
+      order_id: this.document.bundle.current_order_id,
+      bundle_item_name: this.document.bundle.current_bundle_item_name,
+      bundle_item_type: this.document.bundle.current_bundle_item_type,
+      created: this.document.bundle.current_membership_created,
+    }
+    modal.componentInstance.saved.subscribe(
+      ({
+        bundle_item_name,
+        bundle_item_type,
+      }: {
+        bundle_item_name: string
+        bundle_item_type: string
+      }) => {
+        this.documentBundleService
+          .updateMembership(
+            this.document.bundle.id,
+            this.document.bundle.current_membership_id,
+            bundle_item_name,
+            bundle_item_type
+          )
+          .pipe(first())
+          .subscribe({
+            next: () => {
+              modal.close()
+              this.reloadRemoteVersion()
+            },
+            error: (error) =>
+              this.toastService.showError(
+                $localize`Error updating bundle`,
+                error
+              ),
+          })
+      }
+    )
   }
 
   removeFromBundle() {
@@ -1541,9 +1587,50 @@ export class DocumentDetailComponent
       )
       .pipe(first())
       .subscribe({
+        next: () => {
+          this.loadBundles()
+          this.reloadRemoteVersion()
+        },
+        error: (error) =>
+          this.toastService.showError($localize`Error updating bundle`, error),
+      })
+  }
+
+  addToSelectedBundle() {
+    if (!this.document || this.document.bundle || !this.selectedBundleId) return
+    this.documentBundleService
+      .addDocument(this.selectedBundleId, this.documentId)
+      .pipe(first())
+      .subscribe({
         next: () => this.reloadRemoteVersion(),
         error: (error) =>
           this.toastService.showError($localize`Error updating bundle`, error),
+      })
+  }
+
+  createBundleForCurrentDocument() {
+    if (!this.document || this.document.bundle) return
+    this.documentBundleService
+      .createFromDocuments([this.documentId])
+      .pipe(first())
+      .subscribe({
+        next: () => {
+          this.loadBundles()
+          this.reloadRemoteVersion()
+        },
+        error: (error) =>
+          this.toastService.showError($localize`Error creating bundle`, error),
+      })
+  }
+
+  private loadBundles() {
+    this.documentBundleService
+      .listAll('bundle_id')
+      .pipe(first(), takeUntil(this.unsubscribeNotifier))
+      .subscribe({
+        next: (result) => (this.bundles = result.results),
+        error: (error) =>
+          this.toastService.showError($localize`Error loading bundles`, error),
       })
   }
 

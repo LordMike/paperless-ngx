@@ -34,6 +34,28 @@
     (versionsUpdated)="onVersionsUpdated($event)"
   />
 
+  @if (document?.bundle) {
+    <div class="btn-group" ngbDropdown role="group">
+      <button class="btn btn-sm btn-outline-primary dropdown-toggle" ngbDropdownToggle>
+        <i-bs name="stack"></i-bs><span class="d-none d-lg-inline ps-1">{{document.bundle.bundle_id}}</span>
+      </button>
+      <div class="dropdown-menu shadow" ngbDropdownMenu>
+        @for (item of document.bundle.items; track item.membership_id) {
+          <a
+            ngbDropdownItem
+            [routerLink]="['/documents', item.document, 'details']"
+            [class.active]="item.document === documentId"
+          >
+            {{item.bundle_item_name}}
+            @if (item.title && item.title !== item.bundle_item_name) {
+              <span class="text-muted"> - {{item.title}}</span>
+            }
+          </a>
+        }
+      </div>
+    </div>
+  }
+
   <div class="btn-group">
     <button (click)="download()" class="btn btn-sm btn-outline-primary" [disabled]="downloading">
       @if (downloading) {
@@ -154,47 +176,6 @@
 
         <ng-container *ngTemplateOutlet="saveButtons"></ng-container>
       </div>
-
-      @if (document?.bundle) {
-        <div class="border rounded p-2 mb-3">
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <a class="fw-semibold text-decoration-none" routerLink="/bundles/{{document.bundle.id}}">
-              <ng-container i18n>Bundle</ng-container> {{document.bundle.bundle_id}}
-            </a>
-            <div class="btn-group btn-group-sm ms-auto">
-              <button type="button" class="btn btn-outline-secondary" i18n-title title="Previous bundle document" [disabled]="!getBundlePrevious()" (click)="openBundleItem(getBundlePrevious())">
-                <i-bs name="arrow-left"></i-bs>
-              </button>
-              <div ngbDropdown class="btn-group" role="group">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" ngbDropdownToggle>
-                  {{document.bundle.current_order_id}}. {{document.bundle.current_bundle_item_name}}
-                </button>
-                <div ngbDropdownMenu class="shadow">
-                  @for (item of document.bundle.items; track item.membership_id) {
-                    <button ngbDropdownItem (click)="openBundleItem(item)" [class.active]="item.document === documentId">
-                      {{item.order_id}}. {{item.bundle_item_name}}
-                      @if (item.title && item.title !== item.bundle_item_name) {
-                        <span class="text-muted"> - {{item.title}}</span>
-                      }
-                    </button>
-                  }
-                </div>
-              </div>
-              <button type="button" class="btn btn-outline-secondary" i18n-title title="Next bundle document" [disabled]="!getBundleNext()" (click)="openBundleItem(getBundleNext())">
-                <i-bs name="arrow-right"></i-bs>
-              </button>
-              @if (userCanEdit) {
-                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item name" (click)="editBundleItemName()">
-                  <i-bs name="pencil"></i-bs>
-                </button>
-                <button type="button" class="btn btn-outline-danger" i18n-title title="Remove from bundle" (click)="removeFromBundle()">
-                  <i-bs name="x"></i-bs>
-                </button>
-              }
-            </div>
-          </div>
-        </div>
-      }
 
       <ul ngbNav #nav="ngbNav" class="nav-underline flex-nowrap flex-md-wrap overflow-auto" (navChange)="onNavChange($event)" [(activeId)]="activeNavID">
         <li [ngbNavItem]="DocumentDetailNavIDs.Details">
@@ -390,6 +371,105 @@
               <pngx-metadata-collapse i18n-title title="Archived document metadata" [metadata]="metadata.archive_metadata"></pngx-metadata-collapse>
             }
 
+          </ng-template>
+        </li>
+
+        <li [ngbNavItem]="DocumentDetailNavIDs.Bundle">
+          <a class="text-nowrap" ngbNavLink i18n>Bundle @if (document?.bundle) {
+            <span class="badge text-bg-secondary ms-1">1</span>
+          }</a>
+          <ng-template ngbNavContent>
+            <div class="mb-3">
+              @if (document?.bundle) {
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-lg-6">
+                    <label class="form-label" for="documentBundleSelect" i18n>Bundle</label>
+                    <div class="input-group">
+                      <select id="documentBundleSelect" class="form-select" [(ngModel)]="selectedBundleId" [ngModelOptions]="{standalone: true}" disabled>
+                        <option [ngValue]="document.bundle.id">{{document.bundle.bundle_id}}</option>
+                      </select>
+                      <a class="btn btn-outline-secondary" [routerLink]="['/bundles', document.bundle.id]">
+                        <i-bs name="box-arrow-up-right" class="me-1"></i-bs><ng-container i18n>Open</ng-container>
+                      </a>
+                    </div>
+                  </div>
+                  <div class="col-12 col-lg-6">
+                    <table class="table table-borderless mb-0">
+                      <tbody>
+                        <tr>
+                          <td i18n>Name</td>
+                          <td>{{document.bundle.current_bundle_item_name}}</td>
+                        </tr>
+                        <tr>
+                          <td i18n>Type</td>
+                          <td>{{document.bundle.current_bundle_item_type || '-'}}</td>
+                        </tr>
+                        <tr>
+                          <td i18n>Added on</td>
+                          <td>{{document.bundle.current_membership_created | customDate}}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                @if (userCanEdit) {
+                  <div class="btn-group btn-group-sm mb-3">
+                    <button type="button" class="btn btn-outline-secondary" (click)="editCurrentBundleMembership()">
+                      <i-bs name="pencil" class="me-1"></i-bs><ng-container i18n>Edit</ng-container>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" (click)="removeFromBundle()">
+                      <i-bs name="x" class="me-1"></i-bs><ng-container i18n>Remove from bundle</ng-container>
+                    </button>
+                  </div>
+                }
+
+                <div class="card border table-responsive">
+                  <table class="table table-striped align-middle shadow-sm mb-0">
+                    <thead>
+                      <tr>
+                        <th i18n>Name</th>
+                        <th class="d-none d-sm-table-cell" i18n>Type</th>
+                        <th i18n>Document</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of document.bundle.items; track item.membership_id) {
+                        <tr [class.table-active]="item.document === documentId">
+                          <td>{{item.bundle_item_name}}</td>
+                          <td class="d-none d-sm-table-cell">{{item.bundle_item_type || '-'}}</td>
+                          <td>
+                            <a [routerLink]="['/documents', item.document, 'details']">{{item.title || item.document}}</a>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="row g-3 align-items-end">
+                  <div class="col-12 col-lg-6">
+                    <label class="form-label" for="documentBundleAddSelect" i18n>Bundle</label>
+                    <select id="documentBundleAddSelect" class="form-select" [(ngModel)]="selectedBundleId" [ngModelOptions]="{standalone: true}">
+                      <option [ngValue]="null" i18n>Select bundle</option>
+                      @for (bundle of bundles; track bundle.id) {
+                        <option [ngValue]="bundle.id">{{bundle.bundle_id}}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="col-auto">
+                    <button type="button" class="btn btn-outline-primary" (click)="addToSelectedBundle()" [disabled]="!selectedBundleId || !userCanEdit">
+                      <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Add to bundle</ng-container>
+                    </button>
+                  </div>
+                  <div class="col-auto">
+                    <button type="button" class="btn btn-outline-primary" (click)="createBundleForCurrentDocument()" [disabled]="!userCanEdit">
+                      <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create bundle</ng-container>
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
           </ng-template>
         </li>
 
