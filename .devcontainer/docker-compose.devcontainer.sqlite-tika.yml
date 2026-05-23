@@ -41,6 +41,7 @@ services:
       - ..:/usr/src/paperless/paperless-ngx:delegated
       - ../.devcontainer/vscode:/usr/src/paperless/paperless-ngx/.vscode:delegated # VSCode config files
       - virtualenv:/usr/src/paperless/paperless-ngx/.venv # Virtual environment persisted in volume
+      - uvdata:/usr/src/paperless/.local/share/uv # uv-managed Python installations persisted in volume
       - /usr/src/paperless/paperless-ngx/src/documents/static/frontend # Static frontend files exist only in container
       - /usr/src/paperless/paperless-ngx/src/.pytest_cache
       - /usr/src/paperless/paperless-ngx/.ruff_cache
@@ -56,8 +57,10 @@ services:
       PAPERLESS_TIKA_ENDPOINT: http://tika:9998
       PAPERLESS_STATICDIR: ./src/documents/static
       PAPERLESS_DEBUG: true
+      PAPERLESS_SECRET_KEY: devcontainer-insecure-secret-key
+      UV_CACHE_DIR: /usr/src/paperless/paperless-ngx/.uv-cache
     # Overrides default command so things don't shut down after the process ends.
-    command: /bin/sh -c "chown -R paperless:paperless /usr/src/paperless/paperless-ngx/src/documents/static/frontend && chown -R paperless:paperless /usr/src/paperless/paperless-ngx/.ruff_cache && while sleep 1000; do :; done"
+    command: /bin/sh -c "chown -R paperless:paperless /usr/src/paperless/.local/share/uv /usr/src/paperless/paperless-ngx/src/documents/static/frontend /usr/src/paperless/paperless-ngx/.ruff_cache /usr/src/paperless/paperless-ngx/data /usr/src/paperless/paperless-ngx/media /usr/src/paperless/paperless-ngx/consume && while sleep 1000; do :; done"
   gotenberg:
     image: docker.io/gotenberg/gotenberg:8.17
     restart: unless-stopped
@@ -75,3 +78,4 @@ volumes:
   media:
   redisdata:
   virtualenv:
+  uvdata:
