@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from datetime import timedelta
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from documents.bundles import BundleItemInput
 from documents.bundles import add_document_to_bundle
 from documents.bundles import create_bundle
+from documents.bundles import generate_bundle_id
 from documents.bundles import remove_membership
 from documents.bundles import reorder_bundle
 from documents.models import DocumentBundle
@@ -25,11 +30,94 @@ class TestDocumentBundleModel(TestCase):
             items=[BundleItemInput(document=document) for document in docs],
         )
 
-        self.assertRegex(bundle.bundle_id, r"^A[0-9A-Z]{3}$")
+        self.assertEqual(bundle.bundle_id, "BND-001")
         self.assertEqual(
             list(bundle.memberships.values_list("document_id", "order_id")),
             [(docs[0].id, 1), (docs[1].id, 2), (docs[2].id, 3)],
         )
+
+    def test_generate_bundle_id_uses_base36_suffix(self):
+        DocumentBundle.objects.create(bundle_id="BND-009")
+
+        self.assertEqual(generate_bundle_id(), "BND-00A")
+
+    def test_generate_bundle_id_uses_latest_valid_generated_id_as_seed(self):
+        DocumentBundle.objects.create(bundle_id="BND-00A")
+        DocumentBundle.objects.create(bundle_id="BND-00Z")
+
+        self.assertEqual(generate_bundle_id(), "BND-010")
+
+    def test_generate_bundle_id_ignores_invalid_generated_suffix(self):
+        DocumentBundle.objects.create(bundle_id="BND-009")
+        DocumentBundle.objects.create(bundle_id="BND-__")
+
+        self.assertEqual(generate_bundle_id(), "BND-00A")
+
+    def test_generate_bundle_id_ignores_user_supplied_ids(self):
+        DocumentBundle.objects.create(bundle_id="INS-2026-001")
+
+        self.assertEqual(generate_bundle_id(), "BND-001")
+
+    def test_generate_bundle_id_skips_existing_candidate_batch(self):
+        now = timezone.now()
+        seed = DocumentBundle.objects.create(bundle_id="BND-000")
+        for suffix in (
+            "001",
+            "002",
+            "003",
+            "004",
+            "005",
+            "006",
+            "007",
+            "008",
+            "009",
+            "00A",
+            "00B",
+            "00C",
+            "00D",
+            "00E",
+            "00F",
+            "00G",
+            "00H",
+            "00I",
+            "00J",
+            "00K",
+        ):
+            DocumentBundle.objects.create(bundle_id=f"BND-{suffix}")
+        DocumentBundle.objects.exclude(pk=seed.pk).update(
+            created=now - timedelta(days=1),
+        )
+        DocumentBundle.objects.filter(pk=seed.pk).update(created=now)
+
+        self.assertEqual(generate_bundle_id(), "BND-00L")
+
+    def test_create_bundle_retries_generated_id_after_insert_race(self):
+        doc = DocumentFactory()
+        real_create = DocumentBundle.objects.create
+        calls = 0
+
+        def create_with_race(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise IntegrityError("simulated generated ID race")
+            return real_create(*args, **kwargs)
+
+        with (
+            mock.patch(
+                "documents.bundles.generate_bundle_id",
+                side_effect=["BND-001", "BND-002"],
+            ),
+            mock.patch.object(
+                DocumentBundle.objects,
+                "create",
+                side_effect=create_with_race,
+            ),
+        ):
+            bundle = create_bundle(items=[BundleItemInput(document=doc)])
+
+        self.assertEqual(bundle.bundle_id, "BND-002")
+        self.assertEqual(calls, 2)
 
     def test_reject_duplicate_bundle_id(self):
         DocumentBundle.objects.create(bundle_id="A87")
@@ -192,7 +280,7 @@ class TestDocumentBundleAPI(APITestCase):
 
         suggested = self.client.get("/api/bundles/suggest_id/")
         self.assertEqual(suggested.status_code, status.HTTP_200_OK)
-        self.assertRegex(suggested.data["bundle_id"], r"^A[0-9A-Z]{3}$")
+        self.assertRegex(suggested.data["bundle_id"], r"^BND-[0-9A-Z]{3,}$")
 
         moved = self.client.post(
             f"/api/bundles/{target.pk}/move_document/",

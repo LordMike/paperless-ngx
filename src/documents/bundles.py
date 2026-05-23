@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 
 BUNDLE_ID_MAX_LENGTH = 32
 BUNDLE_ID_ALLOWED_CHARS = set(string.ascii_uppercase + string.digits + "_-")
+BUNDLE_ID_GENERATED_PREFIX = "BND-"
+BUNDLE_ID_GENERATED_BATCH_SIZE = 20
+BUNDLE_ID_GENERATED_SUFFIX_MIN_LENGTH = 3
+BUNDLE_ID_GENERATED_SUFFIX_CHARS = set(string.digits + string.ascii_uppercase)
 
 
 @dataclass(frozen=True)
@@ -53,13 +57,58 @@ def _to_base36(value: int) -> str:
     return result
 
 
+def _from_base36(value: str) -> int:
+    return int(value, 36)
+
+
+def _format_generated_bundle_id(value: int) -> str:
+    suffix = _to_base36(value).zfill(BUNDLE_ID_GENERATED_SUFFIX_MIN_LENGTH)
+    return f"{BUNDLE_ID_GENERATED_PREFIX}{suffix}"
+
+
+def _parse_generated_bundle_id(bundle_id: str) -> int | None:
+    if not bundle_id.startswith(BUNDLE_ID_GENERATED_PREFIX):
+        return None
+    suffix = bundle_id[len(BUNDLE_ID_GENERATED_PREFIX) :]
+    if not suffix:
+        return None
+    if any(char not in BUNDLE_ID_GENERATED_SUFFIX_CHARS for char in suffix):
+        return None
+    return _from_base36(suffix)
+
+
 def generate_bundle_id() -> str:
-    max_id = DocumentBundle.objects.aggregate(max_id=Max("id"))["max_id"] or 0
-    start = max_id
-    for offset in range(10000):
-        candidate = f"A{_to_base36(start + offset).zfill(3)}"
-        if not DocumentBundle.objects.filter(bundle_id=candidate).exists():
-            return candidate
+    latest_generated_ids = (
+        DocumentBundle.objects.filter(
+            bundle_id__startswith=BUNDLE_ID_GENERATED_PREFIX,
+        )
+        .order_by("-created", "-id")
+        .values_list("bundle_id", flat=True)[:5]
+    )
+    seed = 0
+    for bundle_id in latest_generated_ids:
+        parsed = _parse_generated_bundle_id(bundle_id)
+        if parsed is not None:
+            seed = parsed
+            break
+
+    next_value = seed + 1
+    while True:
+        candidates = [
+            _format_generated_bundle_id(next_value + offset)
+            for offset in range(BUNDLE_ID_GENERATED_BATCH_SIZE)
+        ]
+        existing = set(
+            DocumentBundle.objects.filter(bundle_id__in=candidates).values_list(
+                "bundle_id",
+                flat=True,
+            ),
+        )
+        for candidate in candidates:
+            if candidate not in existing:
+                return candidate
+        next_value += BUNDLE_ID_GENERATED_BATCH_SIZE
+
     raise ValidationError("Could not generate a unique bundle ID.")
 
 
@@ -105,10 +154,11 @@ def create_bundle(
         normalized_bundle_id = normalize_bundle_id(bundle_id) if bundle_id else None
         for attempt in range(10):
             try:
-                bundle = DocumentBundle.objects.create(
-                    bundle_id=normalized_bundle_id or generate_bundle_id(),
-                    name=name or "",
-                )
+                with transaction.atomic():
+                    bundle = DocumentBundle.objects.create(
+                        bundle_id=normalized_bundle_id or generate_bundle_id(),
+                        name=name or "",
+                    )
                 break
             except IntegrityError:
                 if normalized_bundle_id is not None or attempt == 9:
