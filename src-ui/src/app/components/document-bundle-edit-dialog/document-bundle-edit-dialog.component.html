@@ -13,6 +13,9 @@
     <button type="button" [disabled]="!closeEnabled" class="btn-close" aria-label="Close" (click)="close()"></button>
   </div>
   <div class="modal-body">
+    @if (description) {
+      <p class="text-muted">{{description}}</p>
+    }
     <div class="mb-3">
       <label class="form-label" for="bundleName" i18n>Name</label>
       <input id="bundleName" class="form-control" formControlName="name" autocomplete="off">

@@ -22,6 +22,9 @@ export class DocumentBundleEditDialogComponent {
   @Input()
   mode: 'create' | 'edit' = 'edit'
 
+  @Input()
+  description: string
+
   @Output()
   saved = new EventEmitter<{ name: string; bundle_id: string }>()
 

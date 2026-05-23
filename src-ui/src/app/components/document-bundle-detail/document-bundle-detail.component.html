@@ -1,5 +1,5 @@
 <pngx-page-header [title]="bundle ? 'Bundle ' + bundle.bundle_id : 'Bundle'">
-  <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteBundle()" [disabled]="!bundle">
+  <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteBundle()" [disabled]="!bundle || deleting">
     <i-bs name="trash" class="me-1"></i-bs><ng-container i18n>Delete bundle</ng-container>
   </button>
 </pngx-page-header>
@@ -42,10 +42,10 @@
             <td>{{item.document_title || item.document}}</td>
             <td class="text-end">
               <div class="btn-group btn-group-sm">
-                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item" (click)="editItem(item)">
+                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item" (click)="editItem(item)" [disabled]="removingMembership || deleting">
                   <i-bs name="pencil"></i-bs>
                 </button>
-                <button type="button" class="btn btn-outline-danger" i18n-title title="Remove from bundle" (click)="remove(item)">
+                <button type="button" class="btn btn-outline-danger" i18n-title title="Remove from bundle" (click)="remove(item)" [disabled]="removingMembership || deleting">
                   <i-bs name="x"></i-bs>
                 </button>
               </div>

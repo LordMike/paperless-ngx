@@ -131,11 +131,17 @@ class StoragePathFilterSet(FilterSet):
 
 
 class DocumentBundleFilterSet(FilterSet):
+    q = CharFilter(method="filter_name_or_bundle_id")
     bundle_id__icontains = CharFilter(
         field_name="bundle_id",
         lookup_expr="icontains",
     )
     name__icontains = CharFilter(field_name="name", lookup_expr="icontains")
+
+    def filter_name_or_bundle_id(self, queryset, name, value):
+        return queryset.filter(
+            Q(bundle_id__icontains=value) | Q(name__icontains=value),
+        )
 
     class Meta:
         model = DocumentBundle

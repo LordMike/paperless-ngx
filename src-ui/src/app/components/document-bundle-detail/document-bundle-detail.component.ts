@@ -14,6 +14,7 @@ import {
 import { CustomDatePipe } from 'src/app/pipes/custom-date.pipe'
 import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { ToastService } from 'src/app/services/toast.service'
+import { ConfirmDialogComponent } from '../common/confirm-dialog/confirm-dialog.component'
 import { PageHeaderComponent } from '../common/page-header/page-header.component'
 import { DocumentBundleItemEditDialogComponent } from '../document-bundle-item-edit-dialog/document-bundle-item-edit-dialog.component'
 
@@ -38,6 +39,8 @@ export class DocumentBundleDetailComponent implements OnInit {
 
   bundle: DocumentBundle
   orderSaving = false
+  deleting = false
+  removingMembership = false
 
   ngOnInit(): void {
     this.load()
@@ -93,10 +96,34 @@ export class DocumentBundleDetailComponent implements OnInit {
   }
 
   remove(item: DocumentBundleItem) {
-    this.bundleService.removeMembership(this.bundle.id, item.id).subscribe({
-      next: () => this.load(),
-      error: (error) =>
-        this.toastService.showError($localize`Error updating bundle`, error),
+    const modal = this.modalService.open(ConfirmDialogComponent, {
+      backdrop: 'static',
+    })
+    modal.componentInstance.title = $localize`Remove from bundle`
+    modal.componentInstance.messageBold = $localize`Remove "${item.bundle_item_name}" from this bundle?`
+    modal.componentInstance.message = $localize`The document will not be deleted. If this is the last document in the bundle, the empty bundle will be deleted.`
+    modal.componentInstance.btnClass = 'btn-danger'
+    modal.componentInstance.btnCaption = $localize`Remove`
+    modal.componentInstance.confirmClicked.subscribe(() => {
+      modal.componentInstance.buttonsEnabled = false
+      this.removingMembership = true
+      const wasLastItem = this.bundle.items.length <= 1
+      this.bundleService.removeMembership(this.bundle.id, item.id).subscribe({
+        next: () => {
+          this.removingMembership = false
+          modal.close()
+          if (wasLastItem) {
+            this.router.navigate(['attributes', 'bundles'])
+          } else {
+            this.load()
+          }
+        },
+        error: (error) => {
+          this.removingMembership = false
+          modal.componentInstance.buttonsEnabled = true
+          this.toastService.showError($localize`Error updating bundle`, error)
+        },
+      })
     })
   }
 
@@ -124,16 +151,29 @@ export class DocumentBundleDetailComponent implements OnInit {
   }
 
   deleteBundle() {
-    if (
-      !window.confirm(
-        $localize`Delete this bundle? Documents will not be deleted.`
-      )
-    )
-      return
-    this.bundleService.delete(this.bundle).subscribe({
-      next: () => this.router.navigate(['documents']),
-      error: (error) =>
-        this.toastService.showError($localize`Error deleting bundle`, error),
+    const modal = this.modalService.open(ConfirmDialogComponent, {
+      backdrop: 'static',
+    })
+    modal.componentInstance.title = $localize`Delete bundle`
+    modal.componentInstance.messageBold = $localize`Delete bundle "${this.bundle.bundle_id}"?`
+    modal.componentInstance.message = $localize`Documents will not be deleted. Only the bundle and its document membership records will be removed.`
+    modal.componentInstance.btnClass = 'btn-danger'
+    modal.componentInstance.btnCaption = $localize`Delete`
+    modal.componentInstance.confirmClicked.subscribe(() => {
+      modal.componentInstance.buttonsEnabled = false
+      this.deleting = true
+      this.bundleService.delete(this.bundle).subscribe({
+        next: () => {
+          this.deleting = false
+          modal.close()
+          this.router.navigate(['attributes', 'bundles'])
+        },
+        error: (error) => {
+          this.deleting = false
+          modal.componentInstance.buttonsEnabled = true
+          this.toastService.showError($localize`Error deleting bundle`, error)
+        },
+      })
     })
   }
 }

@@ -2,7 +2,7 @@
   <div class="col mb-2 mb-xl-0">
     <div class="form-inline d-flex align-items-center">
       <label class="text-muted me-2 mb-0" i18n>Filter by:</label>
-      <input class="form-control form-control-sm flex-fill w-auto" type="text" autofocus (keyup)="onFilterKeyUp($event)" placeholder="Bundle ID" i18n-placeholder>
+      <input class="form-control form-control-sm flex-fill w-auto" type="text" autofocus (keyup)="onFilterKeyUp($event)" placeholder="Name or bundle ID" i18n-placeholder>
     </div>
   </div>
 
@@ -44,22 +44,37 @@
           </td>
         </tr>
       }
+      @if (!loading && bundles.length === 0) {
+        <tr>
+          <td colspan="5" class="text-muted" i18n>No bundles found.</td>
+        </tr>
+      }
       @for (bundle of bundles; track bundle.id) {
         <tr class="data-row fade" [class.show]="show">
           <td>
-            <a [routerLink]="['/bundles', bundle.id]" class="btn btn-link ms-0 ps-0 text-start font-monospace">{{bundle.bundle_id}}</a>
+            <a [routerLink]="['/attributes', 'bundles', bundle.id]" class="btn btn-link ms-0 ps-0 text-start font-monospace">{{bundle.bundle_id}}</a>
           </td>
           <td>{{bundle.name || '-'}}</td>
           <td>{{bundle.document_count || 0}}</td>
           <td class="d-none d-sm-table-cell">{{bundle.created | customDate}}</td>
           <td>
-            <div class="btn-group btn-group-sm">
+            <div class="btn-group btn-group-sm d-none d-sm-inline-flex">
               <button class="btn btn-outline-secondary" (click)="openEditDialog(bundle)">
                 <i-bs width="1em" height="1em" name="pencil" class="me-1"></i-bs><ng-container i18n>Edit</ng-container>
               </button>
               <button class="btn btn-outline-danger" (click)="openDeleteDialog(bundle)">
                 <i-bs width="1em" height="1em" name="trash" class="me-1"></i-bs><ng-container i18n>Delete</ng-container>
               </button>
+            </div>
+            <div ngbDropdown class="d-inline-block d-sm-none">
+              <button type="button" class="btn btn-sm btn-outline-secondary" ngbDropdownToggle i18n-title title="Actions">
+                <i-bs name="three-dots"></i-bs>
+              </button>
+              <div ngbDropdownMenu>
+                <a ngbDropdownItem [routerLink]="['/attributes', 'bundles', bundle.id]" i18n>Open</a>
+                <button ngbDropdownItem type="button" (click)="openEditDialog(bundle)" i18n>Edit</button>
+                <button ngbDropdownItem type="button" class="text-danger" (click)="openDeleteDialog(bundle)" i18n>Delete</button>
+              </div>
             </div>
           </td>
         </tr>

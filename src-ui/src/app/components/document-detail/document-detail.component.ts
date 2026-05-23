@@ -275,6 +275,9 @@ export class DocumentDetailComponent
   selectedBundleId: number | null
   bundleItemName = ''
   bundleItemType = ''
+  bundleItemNameOriginal = ''
+  bundleItemTypeOriginal = ''
+  bundleMembershipSaving = false
 
   documentForm: FormGroup = new FormGroup({
     title: new FormControl(''),
@@ -360,6 +363,13 @@ export class DocumentDetailComponent
       : this.getRenderType(
           this.metadata?.original_mime_type || this.document?.mime_type
         )
+  }
+
+  get bundleMembershipDirty(): boolean {
+    return (
+      this.bundleItemName !== this.bundleItemNameOriginal ||
+      this.bundleItemType !== this.bundleItemTypeOriginal
+    )
   }
 
   get originalContentRenderType(): ContentRenderType {
@@ -987,6 +997,8 @@ export class DocumentDetailComponent
     this.selectedBundleId = doc.bundle?.id ?? null
     this.bundleItemName = doc.bundle?.current_bundle_item_name ?? ''
     this.bundleItemType = doc.bundle?.current_bundle_item_type ?? ''
+    this.bundleItemNameOriginal = this.bundleItemName
+    this.bundleItemTypeOriginal = this.bundleItemType
 
     if (
       this.activeNavID === DocumentDetailNavIDs.Duplicates &&
@@ -1730,7 +1742,13 @@ export class DocumentDetailComponent
   }
 
   saveCurrentBundleMembership() {
-    if (!this.document?.bundle) return
+    if (
+      !this.document?.bundle ||
+      !this.bundleMembershipDirty ||
+      this.bundleMembershipSaving
+    )
+      return
+    this.bundleMembershipSaving = true
     this.documentBundleService
       .updateMembership(
         this.document.bundle.id,
@@ -1740,10 +1758,22 @@ export class DocumentDetailComponent
       )
       .pipe(first())
       .subscribe({
-        next: () => this.reloadRemoteVersion(),
-        error: (error) =>
-          this.toastService.showError($localize`Error updating bundle`, error),
+        next: () => {
+          this.bundleItemNameOriginal = this.bundleItemName
+          this.bundleItemTypeOriginal = this.bundleItemType
+          this.bundleMembershipSaving = false
+          this.reloadRemoteVersion()
+        },
+        error: (error) => {
+          this.bundleMembershipSaving = false
+          this.toastService.showError($localize`Error updating bundle`, error)
+        },
       })
+  }
+
+  discardBundleMembershipChanges() {
+    this.bundleItemName = this.bundleItemNameOriginal
+    this.bundleItemType = this.bundleItemTypeOriginal
   }
 
   addToSelectedBundle() {

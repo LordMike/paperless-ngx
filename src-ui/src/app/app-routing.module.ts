@@ -80,6 +80,11 @@ export const routes: Routes = [
       },
       {
         path: 'bundles/:id',
+        redirectTo: 'attributes/bundles/:id',
+        pathMatch: 'full',
+      },
+      {
+        path: 'attributes/bundles/:id',
         component: DocumentBundleDetailComponent,
         canActivate: [PermissionsGuard],
         data: {

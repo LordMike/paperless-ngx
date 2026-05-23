@@ -402,25 +402,39 @@
                     <tr>
                       <td i18n>Item name</td>
                       <td>
-                        <input id="documentBundleItemName" class="form-control" [(ngModel)]="bundleItemName" [ngModelOptions]="{standalone: true}" (change)="saveCurrentBundleMembership()" [disabled]="!userCanEdit">
+                        <input id="documentBundleItemName" class="form-control" [(ngModel)]="bundleItemName" [ngModelOptions]="{standalone: true}" [disabled]="!userCanEdit || bundleMembershipSaving">
                       </td>
                     </tr>
                     <tr>
                       <td i18n>Type</td>
                       <td>
-                        <input id="documentBundleItemType" class="form-control" [(ngModel)]="bundleItemType" [ngModelOptions]="{standalone: true}" (change)="saveCurrentBundleMembership()" [disabled]="!userCanEdit" placeholder="cover letter" i18n-placeholder>
+                        <input id="documentBundleItemType" class="form-control" [(ngModel)]="bundleItemType" [ngModelOptions]="{standalone: true}" [disabled]="!userCanEdit || bundleMembershipSaving" placeholder="cover letter" i18n-placeholder>
                       </td>
                     </tr>
                     <tr>
                       <td i18n>Added on</td>
                       <td>{{document.bundle.current_membership_created | customDate}}</td>
                     </tr>
+                    <tr>
+                      <td></td>
+                      <td>
+                        <div class="btn-group btn-group-sm">
+                          <button type="button" class="btn btn-primary" (click)="saveCurrentBundleMembership()" [disabled]="!userCanEdit || bundleMembershipSaving || !bundleMembershipDirty">
+                            @if (bundleMembershipSaving) {
+                              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            <ng-container i18n>Save bundle changes</ng-container>
+                          </button>
+                          <button type="button" class="btn btn-outline-secondary" (click)="discardBundleMembershipChanges()" [disabled]="!userCanEdit || bundleMembershipSaving || !bundleMembershipDirty" i18n>Discard</button>
+                        </div>
+                      </td>
+                    </tr>
                   }
                 </tbody>
               </table>
               @if (document?.bundle) {
-                <div class="card border table-responsive">
-                  <table class="table table-striped align-middle shadow-sm mb-0">
+                <div class="table-responsive">
+                  <table class="table table-striped align-middle mb-0">
                     <thead>
                       <tr>
                         <th i18n>Name</th>

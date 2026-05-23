@@ -1,7 +1,11 @@
 import { Component, OnDestroy, OnInit, inject } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { RouterModule } from '@angular/router'
-import { NgbModal, NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap'
+import {
+  NgbDropdownModule,
+  NgbModal,
+  NgbPaginationModule,
+} from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs'
 import { ConfirmDialogComponent } from 'src/app/components/common/confirm-dialog/confirm-dialog.component'
@@ -21,6 +25,7 @@ import { ToastService } from 'src/app/services/toast.service'
   imports: [
     FormsModule,
     RouterModule,
+    NgbDropdownModule,
     NgbPaginationModule,
     NgxBootstrapIconsModule,
     SortableDirective,
@@ -68,7 +73,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
     this.loading = true
     this.bundleService
       .list(this.page, this.pageSize, this.sortField, this.sortReverse, {
-        bundle_id__icontains: this.bundleFilter,
+        q: this.bundleFilter,
       })
       .pipe(takeUntil(this.unsubscribeNotifier))
       .subscribe({

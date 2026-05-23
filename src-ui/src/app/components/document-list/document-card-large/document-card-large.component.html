@@ -33,7 +33,7 @@
               }
               @if (document.bundle) {
                 <a class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border ms-1 text-decoration-none"
-                  routerLink="/bundles/{{document.bundle.id}}"
+                  routerLink="/attributes/bundles/{{document.bundle.id}}"
                   title="Open bundle" i18n-title
                   (click)="$event.stopPropagation()">{{document.bundle.bundle_id}}</a>
               }
