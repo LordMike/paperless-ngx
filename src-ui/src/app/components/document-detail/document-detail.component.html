@@ -48,7 +48,7 @@
           >
             {{item.bundle_item_name}}
             @if (item.title && item.title !== item.bundle_item_name) {
-              <span class="text-muted"> - {{item.title}}</span>
+              <span [class.text-muted]="item.document !== documentId" [class.text-white-50]="item.document === documentId"> - {{item.title}}</span>
             }
           </a>
         }
