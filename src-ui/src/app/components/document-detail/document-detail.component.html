@@ -380,54 +380,45 @@
           }</a>
           <ng-template ngbNavContent>
             <div class="mb-3">
+              <table class="table table-borderless align-middle mb-3">
+                <tbody>
+                  <tr>
+                    <td class="w-25" i18n>Bundle</td>
+                    <td>
+                      <div class="input-group">
+                        <select id="documentBundleSelect" class="form-select" [(ngModel)]="selectedBundleId" [ngModelOptions]="{standalone: true}" (ngModelChange)="onBundleSelectionChange($event)" [disabled]="!userCanEdit">
+                          <option [ngValue]="null" i18n>No bundle</option>
+                          @for (bundle of bundles; track bundle.id) {
+                            <option [ngValue]="bundle.id">{{getBundleOptionLabel(bundle)}}</option>
+                          }
+                        </select>
+                        <button type="button" class="btn btn-outline-secondary" i18n-title title="Create new bundle" (click)="createBundleForCurrentDocument()" [disabled]="!userCanEdit">
+                          <i-bs name="plus"></i-bs>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  @if (document?.bundle) {
+                    <tr>
+                      <td i18n>Item name</td>
+                      <td>
+                        <input id="documentBundleItemName" class="form-control" [(ngModel)]="bundleItemName" [ngModelOptions]="{standalone: true}" (change)="saveCurrentBundleMembership()" [disabled]="!userCanEdit">
+                      </td>
+                    </tr>
+                    <tr>
+                      <td i18n>Type</td>
+                      <td>
+                        <input id="documentBundleItemType" class="form-control" [(ngModel)]="bundleItemType" [ngModelOptions]="{standalone: true}" (change)="saveCurrentBundleMembership()" [disabled]="!userCanEdit" placeholder="cover letter" i18n-placeholder>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td i18n>Added on</td>
+                      <td>{{document.bundle.current_membership_created | customDate}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
               @if (document?.bundle) {
-                <div class="row g-3 mb-3">
-                  <div class="col-12 col-lg-6">
-                    <div class="input-group">
-                      <select id="documentBundleSelect" class="form-select" [(ngModel)]="selectedBundleId" [ngModelOptions]="{standalone: true}" (ngModelChange)="onBundleSelectionChange($event)" [disabled]="!userCanEdit">
-                        @for (bundle of bundles; track bundle.id) {
-                          <option [ngValue]="bundle.id">{{getBundleOptionLabel(bundle)}}</option>
-                        }
-                      </select>
-                      <a class="btn btn-outline-secondary" [routerLink]="['/bundles', document.bundle.id]">
-                        <i-bs name="box-arrow-up-right" class="me-1"></i-bs><ng-container i18n>Open</ng-container>
-                      </a>
-                      <button type="button" class="btn btn-outline-secondary" i18n-title title="Create new bundle" (click)="createBundleForCurrentDocument()" [disabled]="!userCanEdit">
-                        <i-bs name="plus"></i-bs>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="col-12 col-lg-6">
-                    <table class="table table-borderless mb-0">
-                      <tbody>
-                        <tr>
-                          <td i18n>Name</td>
-                          <td>{{document.bundle.current_bundle_item_name}}</td>
-                        </tr>
-                        <tr>
-                          <td i18n>Type</td>
-                          <td>{{document.bundle.current_bundle_item_type || '-'}}</td>
-                        </tr>
-                        <tr>
-                          <td i18n>Added on</td>
-                          <td>{{document.bundle.current_membership_created | customDate}}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                @if (userCanEdit) {
-                  <div class="btn-group btn-group-sm mb-3">
-                    <button type="button" class="btn btn-outline-secondary" (click)="editCurrentBundleMembership()">
-                      <i-bs name="pencil" class="me-1"></i-bs><ng-container i18n>Edit</ng-container>
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" (click)="removeFromBundle()">
-                      <i-bs name="x" class="me-1"></i-bs><ng-container i18n>Remove from bundle</ng-container>
-                    </button>
-                  </div>
-                }
-
                 <div class="card border table-responsive">
                   <table class="table table-striped align-middle shadow-sm mb-0">
                     <thead>
@@ -439,7 +430,7 @@
                     </thead>
                     <tbody>
                       @for (item of document.bundle.items; track item.membership_id) {
-                        <tr [class.table-active]="item.document === documentId">
+                        <tr [class.fw-semibold]="item.document === documentId">
                           <td>
                             <a [routerLink]="['/documents', item.document, 'details']">{{item.bundle_item_name}}</a>
                           </td>
@@ -449,22 +440,6 @@
                       }
                     </tbody>
                   </table>
-                </div>
-              } @else {
-                <div class="row g-3">
-                  <div class="col-12 col-lg-6">
-                    <div class="input-group">
-                      <select id="documentBundleAddSelect" class="form-select" [(ngModel)]="selectedBundleId" [ngModelOptions]="{standalone: true}" (ngModelChange)="onBundleSelectionChange($event)" [disabled]="!userCanEdit">
-                        <option [ngValue]="null" i18n>Select bundle</option>
-                        @for (bundle of bundles; track bundle.id) {
-                          <option [ngValue]="bundle.id">{{getBundleOptionLabel(bundle)}}</option>
-                        }
-                      </select>
-                      <button type="button" class="btn btn-outline-secondary" i18n-title title="Create new bundle" (click)="createBundleForCurrentDocument()" [disabled]="!userCanEdit">
-                        <i-bs name="plus"></i-bs>
-                      </button>
-                    </div>
-                  </div>
                 </div>
               }
             </div>

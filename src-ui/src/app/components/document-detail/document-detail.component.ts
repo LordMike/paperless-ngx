@@ -128,7 +128,6 @@ import {
 import { ShareLinksDialogComponent } from '../common/share-links-dialog/share-links-dialog.component'
 import { SuggestionsDropdownComponent } from '../common/suggestions-dropdown/suggestions-dropdown.component'
 import { DocumentBundleEditDialogComponent } from '../document-bundle-edit-dialog/document-bundle-edit-dialog.component'
-import { DocumentBundleItemEditDialogComponent } from '../document-bundle-item-edit-dialog/document-bundle-item-edit-dialog.component'
 import { DocumentNotesComponent } from '../document-notes/document-notes.component'
 import { ComponentWithPermissions } from '../with-permissions/with-permissions.component'
 import { DocumentHistoryComponent } from './document-history/document-history.component'
@@ -265,7 +264,9 @@ export class DocumentDetailComponent
   documentTypes: DocumentType[]
   storagePaths: StoragePath[]
   bundles: DocumentBundle[] = []
-  selectedBundleId: number
+  selectedBundleId: number | null
+  bundleItemName = ''
+  bundleItemType = ''
 
   documentForm: FormGroup = new FormGroup({
     title: new FormControl(''),
@@ -914,6 +915,8 @@ export class DocumentDetailComponent
     this.title = this.documentTitlePipe.transform(doc.title)
     this.prepareForm(doc)
     this.selectedBundleId = doc.bundle?.id ?? null
+    this.bundleItemName = doc.bundle?.current_bundle_item_name ?? ''
+    this.bundleItemType = doc.bundle?.current_bundle_item_type ?? ''
 
     if (
       this.activeNavID === DocumentDetailNavIDs.Duplicates &&
@@ -1545,9 +1548,17 @@ export class DocumentDetailComponent
       : bundle?.bundle_id
   }
 
-  onBundleSelectionChange(bundleId: number) {
-    if (!bundleId || !this.document) {
+  onBundleSelectionChange(bundleId: number | null) {
+    if (!this.document) {
       this.selectedBundleId = this.document?.bundle?.id ?? null
+      return
+    }
+    if (!bundleId) {
+      if (this.document.bundle) {
+        this.confirmRemoveFromBundle()
+      } else {
+        this.selectedBundleId = null
+      }
       return
     }
     if (this.document.bundle) {
@@ -1570,8 +1581,7 @@ export class DocumentDetailComponent
     })
     let confirmed = false
     modal.componentInstance.title = $localize`Move document`
-    modal.componentInstance.messageBold = $localize`Move this document to bundle "${this.getBundleLabel(targetBundle)}"?`
-    modal.componentInstance.message = $localize`This will remove the document from bundle "${this.getBundleLabel(sourceBundle)}" and add it to bundle "${this.getBundleLabel(targetBundle)}".`
+    modal.componentInstance.message = $localize`Move this document from bundle <strong>${this.escapeHtml(this.getBundleLabel(sourceBundle))}</strong> to bundle <strong>${this.escapeHtml(this.getBundleLabel(targetBundle))}</strong>?`
     modal.componentInstance.btnCaption = $localize`Move`
     modal.componentInstance.confirmClicked.subscribe(() => {
       confirmed = true
@@ -1602,55 +1612,31 @@ export class DocumentDetailComponent
     })
   }
 
-  editCurrentBundleMembership() {
+  private confirmRemoveFromBundle() {
     if (!this.document?.bundle) return
-    const modal = this.modalService.open(
-      DocumentBundleItemEditDialogComponent,
-      {
-        backdrop: 'static',
-      }
-    )
-    modal.componentInstance.item = {
-      id: this.document.bundle.current_membership_id,
-      document: this.documentId,
-      document_title: this.document.title,
-      order_id: this.document.bundle.current_order_id,
-      bundle_item_name: this.document.bundle.current_bundle_item_name,
-      bundle_item_type: this.document.bundle.current_bundle_item_type,
-      created: this.document.bundle.current_membership_created,
-    }
-    modal.componentInstance.saved.subscribe(
-      ({
-        bundle_item_name,
-        bundle_item_type,
-      }: {
-        bundle_item_name: string
-        bundle_item_type: string
-      }) => {
-        this.documentBundleService
-          .updateMembership(
-            this.document.bundle.id,
-            this.document.bundle.current_membership_id,
-            bundle_item_name,
-            bundle_item_type
-          )
-          .pipe(first())
-          .subscribe({
-            next: () => {
-              modal.close()
-              this.reloadRemoteVersion()
-            },
-            error: (error) =>
-              this.toastService.showError(
-                $localize`Error updating bundle`,
-                error
-              ),
-          })
-      }
-    )
+    const sourceBundle = this.document.bundle
+    const modal = this.modalService.open(ConfirmDialogComponent, {
+      backdrop: 'static',
+    })
+    let confirmed = false
+    modal.componentInstance.title = $localize`Remove from bundle`
+    modal.componentInstance.message = $localize`Remove this document from bundle <strong>${this.escapeHtml(this.getBundleLabel(sourceBundle))}</strong>?`
+    modal.componentInstance.btnClass = 'btn-danger'
+    modal.componentInstance.btnCaption = $localize`Remove`
+    modal.componentInstance.confirmClicked.subscribe(() => {
+      confirmed = true
+      modal.componentInstance.buttonsEnabled = false
+      this.removeFromBundle({
+        next: () => modal.close(),
+        error: () => (modal.componentInstance.buttonsEnabled = true),
+      })
+    })
+    modal.result.then(() => {
+      if (!confirmed) this.selectedBundleId = sourceBundle.id
+    })
   }
 
-  removeFromBundle() {
+  removeFromBundle(callbacks?: { next?: () => void; error?: () => void }) {
     if (!this.document?.bundle) return
     this.documentBundleService
       .removeMembership(
@@ -1662,7 +1648,28 @@ export class DocumentDetailComponent
         next: () => {
           this.loadBundles()
           this.reloadRemoteVersion()
+          callbacks?.next?.()
         },
+        error: (error) => {
+          this.selectedBundleId = this.document?.bundle?.id ?? null
+          callbacks?.error?.()
+          this.toastService.showError($localize`Error updating bundle`, error)
+        },
+      })
+  }
+
+  saveCurrentBundleMembership() {
+    if (!this.document?.bundle) return
+    this.documentBundleService
+      .updateMembership(
+        this.document.bundle.id,
+        this.document.bundle.current_membership_id,
+        this.bundleItemName,
+        this.bundleItemType
+      )
+      .pipe(first())
+      .subscribe({
+        next: () => this.reloadRemoteVersion(),
         error: (error) =>
           this.toastService.showError($localize`Error updating bundle`, error),
       })
@@ -1729,6 +1736,12 @@ export class DocumentDetailComponent
           },
         })
     })
+  }
+
+  private escapeHtml(value: string): string {
+    const element = document.createElement('div')
+    element.innerText = value ?? ''
+    return element.innerHTML
   }
 
   private loadBundles() {
