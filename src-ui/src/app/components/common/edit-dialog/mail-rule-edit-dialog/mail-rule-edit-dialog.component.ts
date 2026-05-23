@@ -211,6 +211,7 @@ export class MailRuleEditDialogComponent extends EditDialogComponent<MailRule> {
       attachment_type: new FormControl(MailFilterAttachmentType.Attachments),
       pdf_layout: new FormControl(MailRulePdfLayout.Default),
       consumption_scope: new FormControl(MailRuleConsumptionScope.Attachments),
+      bundle_documents: new FormControl(false),
       order: new FormControl(null),
       action: new FormControl(MailAction.MarkRead),
       action_parameter: new FormControl(null),

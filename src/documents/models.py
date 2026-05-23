@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
 from django.core.validators import MinValueValidator
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -505,6 +506,10 @@ class Document(SoftDeleteModel, ModelWithOwner):  # type: ignore[django-manager-
         *args,
         **kwargs,
     ):
+        from documents.bundles import remove_document_from_all_bundles
+
+        remove_document_from_all_bundles(self)
+
         # If deleting a root document, move all its versions to trash as well.
         if self.root_document_id is None:
             Document.objects.filter(root_document=self).delete()
@@ -512,6 +517,102 @@ class Document(SoftDeleteModel, ModelWithOwner):  # type: ignore[django-manager-
             *args,
             **kwargs,
         )
+
+
+class DocumentBundle(models.Model):
+    bundle_id = models.CharField(
+        _("bundle id"),
+        max_length=32,
+        unique=True,
+        db_index=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[A-Z0-9_-]+$",
+                message=_(
+                    "Bundle IDs may only contain A-Z, 0-9, underscores, and hyphens.",
+                ),
+            ),
+        ],
+        help_text=_("Human-visible bundle identifier."),
+    )
+
+    created = models.DateTimeField(
+        _("created"),
+        default=timezone.now,
+        editable=False,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ("bundle_id",)
+        verbose_name = _("document bundle")
+        verbose_name_plural = _("document bundles")
+
+    def __str__(self) -> str:
+        return self.bundle_id
+
+    def save(self, *args, **kwargs):
+        self.bundle_id = self.bundle_id.upper()
+        return super().save(*args, **kwargs)
+
+
+class DocumentBundleMembership(models.Model):
+    bundle = models.ForeignKey(
+        DocumentBundle,
+        related_name="memberships",
+        on_delete=models.CASCADE,
+        verbose_name=_("bundle"),
+    )
+
+    order_id = models.PositiveIntegerField(
+        _("order"),
+        validators=[MinValueValidator(1)],
+    )
+
+    document = models.ForeignKey(
+        Document,
+        related_name="bundle_memberships",
+        on_delete=models.CASCADE,
+        verbose_name=_("document"),
+    )
+
+    bundle_item_name = models.CharField(
+        _("bundle item name"),
+        max_length=256,
+        blank=True,
+    )
+
+    created = models.DateTimeField(
+        _("created"),
+        default=timezone.now,
+        editable=False,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ("bundle", "order_id")
+        verbose_name = _("document bundle membership")
+        verbose_name_plural = _("document bundle memberships")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["bundle", "order_id"],
+                name="documents_bundle_membership_order_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["document"],
+                name="documents_bundle_membership_document_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["document"], name="documents_bundle_doc_idx"),
+            models.Index(
+                fields=["bundle", "order_id"],
+                name="documents_bundle_order_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.bundle.bundle_id} #{self.order_id}: {self.bundle_item_name}"
 
 
 class SavedView(ModelWithOwner):

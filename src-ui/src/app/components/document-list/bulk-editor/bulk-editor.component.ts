@@ -28,6 +28,7 @@ import {
 } from 'src/app/services/permissions.service'
 import { CorrespondentService } from 'src/app/services/rest/correspondent.service'
 import { CustomFieldsService } from 'src/app/services/rest/custom-fields.service'
+import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { DocumentTypeService } from 'src/app/services/rest/document-type.service'
 import {
   DocumentBulkEditMethod,
@@ -94,6 +95,7 @@ export class BulkEditorComponent
   private customFieldService = inject(CustomFieldsService)
   private permissionService = inject(PermissionsService)
   private savedViewService = inject(SavedViewService)
+  private readonly documentBundleService = inject(DocumentBundleService)
   private readonly shareLinkBundleService = inject(ShareLinkBundleService)
 
   tagSelectionModel = new FilterableDropdownSelectionModel(true)
@@ -319,6 +321,19 @@ export class BulkEditorComponent
       $localize`Error executing bulk operation`,
       error
     )
+  }
+
+  createDocumentBundle() {
+    const documentIds = this.list.documents
+      .filter((document) => this.list.selected.has(document.id))
+      .map((document) => document.id)
+    this.documentBundleService
+      .createFromDocuments(documentIds)
+      .pipe(first())
+      .subscribe({
+        next: () => this.handleOperationSuccess(null, true),
+        error: (error) => this.handleOperationError(null, error),
+      })
   }
 
   private applySelectionData(

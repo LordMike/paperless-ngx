@@ -38,6 +38,7 @@ import { CustomField, CustomFieldDataType } from 'src/app/data/custom-field'
 import { CustomFieldInstance } from 'src/app/data/custom-field-instance'
 import { DataType } from 'src/app/data/datatype'
 import { Document, DocumentVersionInfo } from 'src/app/data/document'
+import { DocumentBundleDocumentSummary } from 'src/app/data/document-bundle'
 import { DocumentMetadata } from 'src/app/data/document-metadata'
 import { DocumentNote } from 'src/app/data/document-note'
 import { DocumentSuggestions } from 'src/app/data/document-suggestions'
@@ -73,6 +74,7 @@ import {
 } from 'src/app/services/permissions.service'
 import { CorrespondentService } from 'src/app/services/rest/correspondent.service'
 import { CustomFieldsService } from 'src/app/services/rest/custom-fields.service'
+import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { DocumentTypeService } from 'src/app/services/rest/document-type.service'
 import {
   BulkEditSourceMode,
@@ -213,6 +215,7 @@ export class DocumentDetailComponent
   private permissionsService = inject(PermissionsService)
   private userService = inject(UserService)
   private customFieldsService = inject(CustomFieldsService)
+  private documentBundleService = inject(DocumentBundleService)
   private http = inject(HttpClient)
   private hotKeyService = inject(HotKeyService)
   private componentRouterService = inject(ComponentRouterService)
@@ -1488,6 +1491,59 @@ export class DocumentDetailComponent
       .getPrevious(this.document.id)
       .subscribe((prevDocId: number) => {
         this.router.navigate(['documents', prevDocId])
+      })
+  }
+
+  getBundlePrevious(): DocumentBundleDocumentSummary {
+    return this.document?.bundle?.items
+      ?.filter((item) => item.order_id < this.document.bundle.current_order_id)
+      .sort((a, b) => b.order_id - a.order_id)[0]
+  }
+
+  getBundleNext(): DocumentBundleDocumentSummary {
+    return this.document?.bundle?.items
+      ?.filter((item) => item.order_id > this.document.bundle.current_order_id)
+      .sort((a, b) => a.order_id - b.order_id)[0]
+  }
+
+  openBundleItem(item: DocumentBundleDocumentSummary) {
+    if (!item || item.document === this.documentId) return
+    this.router.navigate(['documents', item.document])
+  }
+
+  editBundleItemName() {
+    if (!this.document?.bundle) return
+    const name = window.prompt(
+      $localize`Bundle item name`,
+      this.document.bundle.current_bundle_item_name
+    )
+    if (name === null) return
+    this.documentBundleService
+      .updateMembership(
+        this.document.bundle.id,
+        this.document.bundle.current_membership_id,
+        name
+      )
+      .pipe(first())
+      .subscribe({
+        next: () => this.reloadRemoteVersion(),
+        error: (error) =>
+          this.toastService.showError($localize`Error updating bundle`, error),
+      })
+  }
+
+  removeFromBundle() {
+    if (!this.document?.bundle) return
+    this.documentBundleService
+      .removeMembership(
+        this.document.bundle.id,
+        this.document.bundle.current_membership_id
+      )
+      .pipe(first())
+      .subscribe({
+        next: () => this.reloadRemoteVersion(),
+        error: (error) =>
+          this.toastService.showError($localize`Error updating bundle`, error),
       })
   }
 

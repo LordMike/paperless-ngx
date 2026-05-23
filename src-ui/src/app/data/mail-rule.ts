@@ -85,5 +85,7 @@ export interface MailRule extends ObjectWithPermissions {
 
   assign_owner_from_rule: boolean
 
+  bundle_documents: boolean
+
   stop_processing: boolean
 }

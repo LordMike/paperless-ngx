@@ -47,6 +47,7 @@
         <pngx-input-select [horizontal]="true" i18n-title title="Consumption scope" [items]="consumptionScopeOptions" formControlName="consumption_scope" i18n-hint hint="See docs for .eml processing requirements"></pngx-input-select>
         <pngx-input-select [horizontal]="true" i18n-title title="Attachment type" [items]="attachmentTypeOptions" formControlName="attachment_type"></pngx-input-select>
         <pngx-input-select [horizontal]="true" i18n-title title="PDF layout" [items]="pdfLayoutOptions" formControlName="pdf_layout"></pngx-input-select>
+        <pngx-input-switch [horizontal]="true" i18n-title title="Bundle documents created from the same email" formControlName="bundle_documents" i18n-hint hint="If an email produces multiple documents, Paperless will group them into a bundle for easier navigation. The documents remain separate."></pngx-input-switch>
       </div>
       <div class="col-md-6">
         <pngx-input-text [horizontal]="true" i18n-title title="Include only files matching" formControlName="filter_attachment_filename_include" i18n-hint hint="Optional. Wildcards e.g. *.pdf or *invoice* allowed. Can be comma-separated list. Case insensitive." [error]="error?.filter_attachment_filename_include"></pngx-input-text>

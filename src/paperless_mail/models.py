@@ -243,6 +243,16 @@ class MailRule(document_models.ModelWithOwner):
         default=PdfLayout.DEFAULT,
     )
 
+    bundle_documents = models.BooleanField(
+        _("bundle documents created from the same email"),
+        default=False,
+        help_text=_(
+            "If an email produces multiple documents, such as the rendered "
+            "email body and attachments, group them into a bundle for easier "
+            "navigation. The documents remain separate.",
+        ),
+    )
+
     action = models.PositiveSmallIntegerField(
         _("action"),
         choices=MailAction.choices,

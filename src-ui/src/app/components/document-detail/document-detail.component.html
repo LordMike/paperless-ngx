@@ -155,6 +155,47 @@
         <ng-container *ngTemplateOutlet="saveButtons"></ng-container>
       </div>
 
+      @if (document?.bundle) {
+        <div class="border rounded p-2 mb-3">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <a class="fw-semibold text-decoration-none" routerLink="/bundles/{{document.bundle.id}}">
+              <ng-container i18n>Bundle</ng-container> {{document.bundle.bundle_id}}
+            </a>
+            <div class="btn-group btn-group-sm ms-auto">
+              <button type="button" class="btn btn-outline-secondary" i18n-title title="Previous bundle document" [disabled]="!getBundlePrevious()" (click)="openBundleItem(getBundlePrevious())">
+                <i-bs name="arrow-left"></i-bs>
+              </button>
+              <div ngbDropdown class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" ngbDropdownToggle>
+                  {{document.bundle.current_order_id}}. {{document.bundle.current_bundle_item_name}}
+                </button>
+                <div ngbDropdownMenu class="shadow">
+                  @for (item of document.bundle.items; track item.membership_id) {
+                    <button ngbDropdownItem (click)="openBundleItem(item)" [class.active]="item.document === documentId">
+                      {{item.order_id}}. {{item.bundle_item_name}}
+                      @if (item.title && item.title !== item.bundle_item_name) {
+                        <span class="text-muted"> - {{item.title}}</span>
+                      }
+                    </button>
+                  }
+                </div>
+              </div>
+              <button type="button" class="btn btn-outline-secondary" i18n-title title="Next bundle document" [disabled]="!getBundleNext()" (click)="openBundleItem(getBundleNext())">
+                <i-bs name="arrow-right"></i-bs>
+              </button>
+              @if (userCanEdit) {
+                <button type="button" class="btn btn-outline-secondary" i18n-title title="Edit bundle item name" (click)="editBundleItemName()">
+                  <i-bs name="pencil"></i-bs>
+                </button>
+                <button type="button" class="btn btn-outline-danger" i18n-title title="Remove from bundle" (click)="removeFromBundle()">
+                  <i-bs name="x"></i-bs>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
       <ul ngbNav #nav="ngbNav" class="nav-underline flex-nowrap flex-md-wrap overflow-auto" (navChange)="onNavChange($event)" [(activeId)]="activeNavID">
         <li [ngbNavItem]="DocumentDetailNavIDs.Details">
           <a ngbNavLink i18n>Details</a>

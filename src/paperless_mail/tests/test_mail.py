@@ -27,8 +27,10 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from documents.models import Correspondent
+from documents.models import DocumentBundle
 from documents.models import MatchingModel
 from documents.tests.factories import CorrespondentFactory
+from documents.tests.factories import DocumentFactory
 from documents.tests.utils import DirectoriesMixin
 from documents.tests.utils import FileSystemAssertsMixin
 from paperless_mail import tasks
@@ -1650,6 +1652,73 @@ class TestPostConsumeAction(TestCase):
         processed_mail = ProcessedMail.objects.get(uid=self.message_uid)
         self.assertEqual(processed_mail.status, "FAILED")
         self.assertIn("Test Exception", processed_mail.error)
+
+    @mock.patch("paperless_mail.mail.get_mailbox")
+    @mock.patch("paperless_mail.mail.mailbox_login")
+    @mock.patch("paperless_mail.mail.get_rule_action")
+    def test_post_consume_creates_bundle_for_multiple_created_documents(
+        self,
+        mock_get_rule_action,
+        mock_mailbox_login,
+        mock_get_mailbox,
+    ) -> None:
+        self.rule.bundle_documents = True
+        self.rule.save()
+        mock_mailbox = mock.MagicMock()
+        mock_get_mailbox.return_value.__enter__.return_value = mock_mailbox
+        mock_get_rule_action.return_value = mock.MagicMock()
+        docs = [DocumentFactory(title="mail"), DocumentFactory(title="attachment")]
+
+        apply_mail_action(
+            result=[{"document_id": docs[0].id}, {"document_id": docs[1].id}],
+            rule_id=self.rule.pk,
+            message_uid=self.message_uid,
+            message_subject=self.message_subject,
+            message_date=self.message_date,
+            bundle_item_names=["mail body", "Policy schedule.pdf"],
+        )
+
+        bundle = DocumentBundle.objects.get()
+        self.assertEqual(
+            list(
+                bundle.memberships.order_by("order_id").values_list(
+                    "document_id",
+                    "bundle_item_name",
+                    "order_id",
+                ),
+            ),
+            [
+                (docs[0].id, "mail body", 1),
+                (docs[1].id, "Policy schedule.pdf", 2),
+            ],
+        )
+
+    @mock.patch("paperless_mail.mail.get_mailbox")
+    @mock.patch("paperless_mail.mail.mailbox_login")
+    @mock.patch("paperless_mail.mail.get_rule_action")
+    def test_post_consume_does_not_bundle_single_created_document(
+        self,
+        mock_get_rule_action,
+        mock_mailbox_login,
+        mock_get_mailbox,
+    ) -> None:
+        self.rule.bundle_documents = True
+        self.rule.save()
+        mock_mailbox = mock.MagicMock()
+        mock_get_mailbox.return_value.__enter__.return_value = mock_mailbox
+        mock_get_rule_action.return_value = mock.MagicMock()
+        doc = DocumentFactory(title="mail")
+
+        apply_mail_action(
+            result=[{"document_id": doc.id}],
+            rule_id=self.rule.pk,
+            message_uid=self.message_uid,
+            message_subject=self.message_subject,
+            message_date=self.message_date,
+            bundle_item_names=["mail body"],
+        )
+
+        self.assertFalse(DocumentBundle.objects.exists())
 
 
 class TestManagementCommand(TestCase):

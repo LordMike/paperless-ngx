@@ -28,6 +28,7 @@ from django.db.models.functions import Cast
 from django.utils.translation import gettext_lazy as _
 from django_filters import DateFilter
 from django_filters.rest_framework import BooleanFilter
+from django_filters.rest_framework import CharFilter
 from django_filters.rest_framework import DateTimeFilter
 from django_filters.rest_framework import Filter
 from django_filters.rest_framework import FilterSet
@@ -826,6 +827,15 @@ class DocumentFilterSet(FilterSet):
         lookup_expr="isnull",
         exclude=True,
     )
+
+    has_bundle = BooleanFilter(
+        label="Has bundle",
+        field_name="bundle_memberships",
+        lookup_expr="isnull",
+        exclude=True,
+    )
+
+    bundle_id = CharFilter(field_name="bundle_memberships__bundle__bundle_id")
 
     custom_field_query = CustomFieldQueryFilter("custom_field_query")
 

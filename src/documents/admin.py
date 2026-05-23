@@ -7,6 +7,8 @@ from documents.models import Correspondent
 from documents.models import CustomField
 from documents.models import CustomFieldInstance
 from documents.models import Document
+from documents.models import DocumentBundle
+from documents.models import DocumentBundleMembership
 from documents.models import DocumentType
 from documents.models import Note
 from documents.models import PaperlessTask
@@ -118,6 +120,19 @@ class DocumentAdmin(GuardedModelAdmin):
 
         get_backend().add_or_update(obj)
         super().save_model(request, obj, form, change)
+
+
+class DocumentBundleMembershipInline(admin.TabularInline):
+    model = DocumentBundleMembership
+    extra = 0
+    fields = ("order_id", "document", "bundle_item_name", "created")
+    readonly_fields = ("created",)
+
+
+class DocumentBundleAdmin(admin.ModelAdmin):
+    list_display = ("bundle_id", "created")
+    search_fields = ("bundle_id", "memberships__document__title")
+    inlines = [DocumentBundleMembershipInline]
 
 
 class RuleInline(admin.TabularInline):
@@ -237,6 +252,7 @@ admin.site.register(Correspondent, CorrespondentAdmin)
 admin.site.register(Tag, TagAdmin)
 admin.site.register(DocumentType, DocumentTypeAdmin)
 admin.site.register(Document, DocumentAdmin)
+admin.site.register(DocumentBundle, DocumentBundleAdmin)
 admin.site.register(SavedView, SavedViewAdmin)
 admin.site.register(StoragePath, StoragePathAdmin)
 admin.site.register(PaperlessTask, TaskAdmin)

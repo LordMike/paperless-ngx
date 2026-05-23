@@ -9,6 +9,7 @@ import { UsersAndGroupsComponent } from './components/admin/users-groups/users-g
 import { AppFrameComponent } from './components/app-frame/app-frame.component'
 import { DashboardComponent } from './components/dashboard/dashboard.component'
 import { DocumentAsnComponent } from './components/document-asn/document-asn.component'
+import { DocumentBundleDetailComponent } from './components/document-bundle-detail/document-bundle-detail.component'
 import { DocumentDetailComponent } from './components/document-detail/document-detail.component'
 import { DocumentListComponent } from './components/document-list/document-list.component'
 import { DocumentAttributesComponent } from './components/manage/document-attributes/document-attributes.component'
@@ -75,6 +76,18 @@ export const routes: Routes = [
             type: PermissionType.Document,
           },
           componentName: 'DocumentDetailComponent',
+        },
+      },
+      {
+        path: 'bundles/:id',
+        component: DocumentBundleDetailComponent,
+        canActivate: [PermissionsGuard],
+        data: {
+          requiredPermission: {
+            action: PermissionAction.View,
+            type: PermissionType.Document,
+          },
+          componentName: 'DocumentBundleDetailComponent',
         },
       },
       {
