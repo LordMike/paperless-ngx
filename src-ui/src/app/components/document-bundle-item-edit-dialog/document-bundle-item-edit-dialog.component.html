@@ -1,9 +1,6 @@
 <form [formGroup]="itemForm" (ngSubmit)="save()" autocomplete="off">
   <div class="modal-header">
     <h4 class="modal-title" i18n>Edit bundle item</h4>
-    @if (item?.id) {
-      <span class="badge bg-primary text-primary-text-contrast ms-2">ID: {{item.id}}</span>
-    }
     <button type="button" [disabled]="!closeEnabled" class="btn-close" aria-label="Close" (click)="close()"></button>
   </div>
   <div class="modal-body">
