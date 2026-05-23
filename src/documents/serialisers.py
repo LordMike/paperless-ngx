@@ -982,6 +982,7 @@ class DocumentBundleItemSummarySerializer(serializers.Serializer[dict[str, Any]]
 
 class DocumentBundleSummarySerializer(serializers.Serializer[dict[str, Any]]):
     id = serializers.IntegerField()
+    name = serializers.CharField(allow_blank=True)
     bundle_id = serializers.CharField()
     current_membership_id = serializers.IntegerField()
     current_order_id = serializers.IntegerField()
@@ -1045,6 +1046,7 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
         model = DocumentBundle
         fields = (
             "id",
+            "name",
             "bundle_id",
             "created",
             "document_count",
@@ -1080,6 +1082,7 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
         documents = validated_data.pop("documents", None)
         create_items = validated_data.pop("create_items", None)
         bundle_id = validated_data.get("bundle_id")
+        name = validated_data.get("name")
 
         if create_items:
             items = [
@@ -1094,20 +1097,70 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
             items = [BundleItemInput(document=document) for document in documents]
 
         try:
-            return create_bundle(items=items, bundle_id=bundle_id)
+            return create_bundle(items=items, bundle_id=bundle_id, name=name)
         except ValidationError as e:
             raise serializers.ValidationError(e.messages)
 
     def update(self, instance, validated_data):
+        update_fields = []
+        if "name" in validated_data:
+            instance.name = validated_data["name"]
+            update_fields.append("name")
         bundle_id = validated_data.get("bundle_id")
         if bundle_id is not None:
             instance.bundle_id = bundle_id
-            instance.save(update_fields=["bundle_id"])
+            update_fields.append("bundle_id")
+        if update_fields:
+            instance.save(update_fields=update_fields)
         return instance
 
 
 class DocumentBundleAddDocumentSerializer(serializers.Serializer):
     document = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
+    bundle_item_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=256,
+    )
+    bundle_item_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=128,
+    )
+
+
+class DocumentBundleCreateForDocumentSerializer(serializers.Serializer):
+    document = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
+    name = serializers.CharField(required=False, allow_blank=True, max_length=128)
+    bundle_id = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    bundle_item_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=256,
+    )
+    bundle_item_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=128,
+    )
+
+    def validate_bundle_id(self, value):
+        if not value:
+            return value
+        from documents.bundles import normalize_bundle_id
+
+        normalized = normalize_bundle_id(value)
+        if DocumentBundle.objects.filter(bundle_id=normalized).exists():
+            raise serializers.ValidationError(
+                "Document bundle with this bundle ID already exists.",
+            )
+        return normalized
+
+
+class DocumentBundleMoveDocumentSerializer(serializers.Serializer):
+    membership = serializers.PrimaryKeyRelatedField(
+        queryset=DocumentBundleMembership.objects.select_related("document", "bundle"),
+    )
     bundle_item_name = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -1245,6 +1298,7 @@ class DocumentSerializer(
         ]
         return {
             "id": bundle.id,
+            "name": bundle.name,
             "bundle_id": bundle.bundle_id,
             "current_membership_id": membership.id,
             "current_order_id": membership.order_id,

@@ -127,6 +127,7 @@ import {
 } from '../common/pdf-viewer/pdf-viewer.types'
 import { ShareLinksDialogComponent } from '../common/share-links-dialog/share-links-dialog.component'
 import { SuggestionsDropdownComponent } from '../common/suggestions-dropdown/suggestions-dropdown.component'
+import { DocumentBundleEditDialogComponent } from '../document-bundle-edit-dialog/document-bundle-edit-dialog.component'
 import { DocumentBundleItemEditDialogComponent } from '../document-bundle-item-edit-dialog/document-bundle-item-edit-dialog.component'
 import { DocumentNotesComponent } from '../document-notes/document-notes.component'
 import { ComponentWithPermissions } from '../with-permissions/with-permissions.component'
@@ -1530,6 +1531,77 @@ export class DocumentDetailComponent
     this.router.navigate(['documents', item.document])
   }
 
+  getBundleLabel(
+    bundle: DocumentBundle | { name?: string; bundle_id?: string }
+  ) {
+    return bundle?.name || bundle?.bundle_id
+  }
+
+  getBundleOptionLabel(
+    bundle: DocumentBundle | { name?: string; bundle_id?: string }
+  ) {
+    return bundle?.name
+      ? `${bundle.name} (${bundle.bundle_id})`
+      : bundle?.bundle_id
+  }
+
+  onBundleSelectionChange(bundleId: number) {
+    if (!bundleId || !this.document) {
+      this.selectedBundleId = this.document?.bundle?.id ?? null
+      return
+    }
+    if (this.document.bundle) {
+      if (bundleId === this.document.bundle.id) return
+      this.confirmMoveToBundle(bundleId)
+      return
+    }
+    this.addToBundle(bundleId)
+  }
+
+  private confirmMoveToBundle(bundleId: number) {
+    const targetBundle = this.bundles.find((bundle) => bundle.id === bundleId)
+    if (!targetBundle || !this.document?.bundle) {
+      this.selectedBundleId = this.document?.bundle?.id ?? null
+      return
+    }
+    const sourceBundle = this.document.bundle
+    const modal = this.modalService.open(ConfirmDialogComponent, {
+      backdrop: 'static',
+    })
+    let confirmed = false
+    modal.componentInstance.title = $localize`Move document`
+    modal.componentInstance.messageBold = $localize`Move this document to bundle "${this.getBundleLabel(targetBundle)}"?`
+    modal.componentInstance.message = $localize`This will remove the document from bundle "${this.getBundleLabel(sourceBundle)}" and add it to bundle "${this.getBundleLabel(targetBundle)}".`
+    modal.componentInstance.btnCaption = $localize`Move`
+    modal.componentInstance.confirmClicked.subscribe(() => {
+      confirmed = true
+      modal.componentInstance.buttonsEnabled = false
+      this.documentBundleService
+        .moveDocument(
+          targetBundle.id,
+          sourceBundle.current_membership_id,
+          sourceBundle.current_bundle_item_name,
+          sourceBundle.current_bundle_item_type
+        )
+        .pipe(first())
+        .subscribe({
+          next: () => {
+            modal.close()
+            this.loadBundles()
+            this.reloadRemoteVersion()
+          },
+          error: (error) => {
+            modal.componentInstance.buttonsEnabled = true
+            this.selectedBundleId = sourceBundle.id
+            this.toastService.showError($localize`Error moving document`, error)
+          },
+        })
+    })
+    modal.result.then(() => {
+      if (!confirmed) this.selectedBundleId = sourceBundle.id
+    })
+  }
+
   editCurrentBundleMembership() {
     if (!this.document?.bundle) return
     const modal = this.modalService.open(
@@ -1598,29 +1670,65 @@ export class DocumentDetailComponent
 
   addToSelectedBundle() {
     if (!this.document || this.document.bundle || !this.selectedBundleId) return
-    this.documentBundleService
-      .addDocument(this.selectedBundleId, this.documentId)
-      .pipe(first())
-      .subscribe({
-        next: () => this.reloadRemoteVersion(),
-        error: (error) =>
-          this.toastService.showError($localize`Error updating bundle`, error),
-      })
+    this.addToBundle(this.selectedBundleId)
   }
 
-  createBundleForCurrentDocument() {
-    if (!this.document || this.document.bundle) return
+  private addToBundle(bundleId: number) {
+    if (!this.document) return
     this.documentBundleService
-      .createFromDocuments([this.documentId])
+      .addDocument(bundleId, this.documentId)
       .pipe(first())
       .subscribe({
         next: () => {
           this.loadBundles()
           this.reloadRemoteVersion()
         },
-        error: (error) =>
-          this.toastService.showError($localize`Error creating bundle`, error),
+        error: (error) => {
+          this.selectedBundleId = this.document?.bundle?.id ?? null
+          this.toastService.showError($localize`Error updating bundle`, error)
+        },
       })
+  }
+
+  createBundleForCurrentDocument() {
+    this.documentBundleService
+      .suggestId()
+      .pipe(first())
+      .subscribe({
+        next: ({ bundle_id }) => this.openCreateBundleDialog(bundle_id),
+        error: () => this.openCreateBundleDialog(''),
+      })
+  }
+
+  private openCreateBundleDialog(bundleId: string) {
+    if (!this.document) return
+    const modal = this.modalService.open(DocumentBundleEditDialogComponent, {
+      backdrop: 'static',
+    })
+    modal.componentInstance.mode = 'create'
+    modal.componentInstance.bundle = {
+      name: '',
+      bundle_id: bundleId,
+    } as DocumentBundle
+    modal.componentInstance.saved.subscribe(({ name, bundle_id }) => {
+      modal.componentInstance.networkActive = true
+      modal.componentInstance.error = null
+      this.documentBundleService
+        .createForDocument(this.documentId, bundle_id, name)
+        .pipe(first())
+        .subscribe({
+          next: () => {
+            modal.close()
+            this.loadBundles()
+            this.reloadRemoteVersion()
+          },
+          error: (error) => {
+            modal.componentInstance.networkActive = false
+            modal.componentInstance.error = error?.error ?? error
+            this.toastService.showError($localize`Error creating bundle`, error)
+          },
+        })
+    })
   }
 
   private loadBundles() {

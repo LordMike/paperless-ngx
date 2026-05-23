@@ -10,6 +10,7 @@ export interface DocumentBundleItem extends ObjectWithId {
 }
 
 export interface DocumentBundle extends ObjectWithId {
+  name?: string
   bundle_id?: string
   created?: string
   document_count?: number
@@ -34,6 +35,7 @@ export interface DocumentBundleDocumentSummary {
 
 export interface DocumentBundleSummary {
   id: number
+  name?: string
   bundle_id: string
   current_membership_id: number
   current_order_id: number

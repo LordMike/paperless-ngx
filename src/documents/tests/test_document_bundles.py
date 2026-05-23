@@ -153,10 +153,16 @@ class TestDocumentBundleAPI(APITestCase):
 
         response = self.client.post(
             "/api/bundles/",
-            {"documents": [doc.pk for doc in docs]},
+            {
+                "documents": [doc.pk for doc in docs],
+                "bundle_id": "A90",
+                "name": "Contract package",
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["bundle_id"], "A90")
+        self.assertEqual(response.data["name"], "Contract package")
         self.assertEqual(
             [item["order_id"] for item in response.data["items"]],
             [1, 2],
@@ -168,3 +174,48 @@ class TestDocumentBundleAPI(APITestCase):
             format="json",
         )
         self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_suggest_id_create_for_document_and_move_document(self):
+        docs = [
+            DocumentFactory(title="Schedule"),
+            DocumentFactory(title="Terms"),
+        ]
+        source = create_bundle(
+            items=[BundleItemInput(document=docs[0], bundle_item_name="schedule")],
+            bundle_id="A91",
+        )
+        target = create_bundle(
+            items=[BundleItemInput(document=docs[1], bundle_item_name="terms")],
+            bundle_id="A92",
+        )
+        membership = source.memberships.get()
+
+        suggested = self.client.get("/api/bundles/suggest_id/")
+        self.assertEqual(suggested.status_code, status.HTTP_200_OK)
+        self.assertRegex(suggested.data["bundle_id"], r"^A[0-9A-Z]{3}$")
+
+        moved = self.client.post(
+            f"/api/bundles/{target.pk}/move_document/",
+            {"membership": membership.pk},
+            format="json",
+        )
+        self.assertEqual(moved.status_code, status.HTTP_200_OK)
+        self.assertEqual(moved.data["document"], docs[0].pk)
+        self.assertEqual(moved.data["bundle_item_name"], "schedule")
+        self.assertFalse(DocumentBundle.objects.filter(pk=source.pk).exists())
+        self.assertEqual(target.memberships.count(), 2)
+
+        created = self.client.post(
+            "/api/bundles/create_for_document/",
+            {
+                "document": docs[0].pk,
+                "bundle_id": "A93",
+                "name": "New package",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(created.data["bundle_id"], "A93")
+        self.assertEqual(created.data["name"], "New package")
+        self.assertEqual(created.data["items"][0]["document"], docs[0].pk)
+        self.assertEqual(target.memberships.count(), 1)

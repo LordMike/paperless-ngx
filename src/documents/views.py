@@ -30,6 +30,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connections
+from django.db import transaction
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import Avg
@@ -190,8 +191,10 @@ from documents.serialisers import CorrespondentSerializer
 from documents.serialisers import CustomFieldSerializer
 from documents.serialisers import DeleteDocumentsSerializer
 from documents.serialisers import DocumentBundleAddDocumentSerializer
+from documents.serialisers import DocumentBundleCreateForDocumentSerializer
 from documents.serialisers import DocumentBundleMembershipSerializer
 from documents.serialisers import DocumentBundleMembershipUpdateSerializer
+from documents.serialisers import DocumentBundleMoveDocumentSerializer
 from documents.serialisers import DocumentBundleReorderSerializer
 from documents.serialisers import DocumentBundleSerializer
 from documents.serialisers import DocumentListSerializer
@@ -540,7 +543,7 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
         OrderingFilter,
     )
     filterset_class = DocumentBundleFilterSet
-    ordering_fields = ("bundle_id", "created", "document_count")
+    ordering_fields = ("name", "bundle_id", "created", "document_count")
 
     def get_queryset(self):
         from documents.bundles import visible_documents_queryset
@@ -567,6 +570,12 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
             )
             .order_by("bundle_id")
         )
+
+    @action(methods=["get"], detail=False, url_path="suggest_id")
+    def suggest_id(self, request):
+        from documents.bundles import generate_bundle_id
+
+        return Response({"bundle_id": generate_bundle_id()})
 
     def _raise_permission_error(self):
         raise PermissionDenied(_("Insufficient document permissions."))
@@ -635,6 +644,92 @@ class DocumentBundleViewSet(PassUserMixin, ModelViewSet[DocumentBundle]):
             DocumentBundleMembershipSerializer(membership).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @action(methods=["post"], detail=False, url_path="create_for_document")
+    def create_for_document(self, request):
+        from documents.bundles import BundleItemInput
+        from documents.bundles import assert_can_change_bundle
+        from documents.bundles import assert_can_change_documents
+        from documents.bundles import create_bundle
+        from documents.bundles import remove_membership
+
+        serializer = DocumentBundleCreateForDocumentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        document = serializer.validated_data["document"]
+        try:
+            assert_can_change_documents(request.user, [document])
+            with transaction.atomic():
+                membership = (
+                    DocumentBundleMembership.objects.select_related("bundle")
+                    .filter(document=document)
+                    .first()
+                )
+                if membership:
+                    assert_can_change_bundle(request.user, membership.bundle)
+                    remove_membership(membership)
+                bundle = create_bundle(
+                    items=[
+                        BundleItemInput(
+                            document=document,
+                            bundle_item_name=serializer.validated_data.get(
+                                "bundle_item_name",
+                            ),
+                            bundle_item_type=serializer.validated_data.get(
+                                "bundle_item_type",
+                            ),
+                        ),
+                    ],
+                    bundle_id=serializer.validated_data.get("bundle_id") or None,
+                    name=serializer.validated_data.get("name"),
+                )
+        except PermissionError:
+            self._raise_permission_error()
+        except DjangoValidationError as e:
+            raise ValidationError(e.messages)
+        return Response(
+            self.get_serializer(bundle).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(methods=["post"], detail=True, url_path="move_document")
+    def move_document(self, request, pk=None):
+        from documents.bundles import add_document_to_bundle
+        from documents.bundles import assert_can_change_documents
+        from documents.bundles import remove_membership
+
+        target_bundle = self.get_object()
+        serializer = DocumentBundleMoveDocumentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = serializer.validated_data["membership"]
+        source_bundle = membership.bundle
+        if source_bundle.pk == target_bundle.pk:
+            return Response(DocumentBundleMembershipSerializer(membership).data)
+        try:
+            self._check_change_bundle(source_bundle)
+            self._check_change_bundle(target_bundle)
+            document = membership.document
+            assert_can_change_documents(request.user, [document])
+            with transaction.atomic():
+                bundle_item_name = serializer.validated_data.get(
+                    "bundle_item_name",
+                    membership.bundle_item_name,
+                )
+                bundle_item_type = serializer.validated_data.get(
+                    "bundle_item_type",
+                    membership.bundle_item_type,
+                )
+                remove_membership(membership)
+                new_membership = add_document_to_bundle(
+                    bundle=target_bundle,
+                    document=document,
+                    bundle_item_name=bundle_item_name,
+                    bundle_item_type=bundle_item_type,
+                )
+        except PermissionError:
+            self._raise_permission_error()
+        except DjangoValidationError as e:
+            raise ValidationError(e.messages)
+        return Response(DocumentBundleMembershipSerializer(new_membership).data)
 
     @action(
         methods=["patch", "delete"],

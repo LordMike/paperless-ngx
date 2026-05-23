@@ -29,6 +29,7 @@
     <thead>
       <tr>
         <th class="fw-normal" pngxSortable="bundle_id" [currentSortField]="sortField" [currentSortReverse]="sortReverse" (sort)="onSort($event)" i18n>Bundle ID</th>
+        <th class="fw-normal" pngxSortable="name" [currentSortField]="sortField" [currentSortReverse]="sortReverse" (sort)="onSort($event)" i18n>Name</th>
         <th class="fw-normal" pngxSortable="document_count" [currentSortField]="sortField" [currentSortReverse]="sortReverse" (sort)="onSort($event)" i18n>Documents</th>
         <th class="fw-normal d-none d-sm-table-cell" pngxSortable="created" [currentSortField]="sortField" [currentSortReverse]="sortReverse" (sort)="onSort($event)" i18n>Created</th>
         <th class="fw-normal" i18n>Actions</th>
@@ -37,7 +38,7 @@
     <tbody>
       @if (loading && bundles.length === 0) {
         <tr>
-          <td colspan="4">
+          <td colspan="5">
             <div class="spinner-border spinner-border-sm me-2" role="status"></div>
             <ng-container i18n>Loading...</ng-container>
           </td>
@@ -48,6 +49,7 @@
           <td>
             <a [routerLink]="['/bundles', bundle.id]" class="btn btn-link ms-0 ps-0 text-start font-monospace">{{bundle.bundle_id}}</a>
           </td>
+          <td>{{bundle.name || '-'}}</td>
           <td>{{bundle.document_count || 0}}</td>
           <td class="d-none d-sm-table-cell">{{bundle.created | customDate}}</td>
           <td>

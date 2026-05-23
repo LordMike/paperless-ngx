@@ -96,6 +96,7 @@ def create_bundle(
     *,
     items: Iterable[BundleItemInput],
     bundle_id: str | None = None,
+    name: str | None = None,
 ) -> DocumentBundle:
     items = _coerce_items(items)
     _validate_documents_are_unbundled(item.document for item in items)
@@ -106,6 +107,7 @@ def create_bundle(
             try:
                 bundle = DocumentBundle.objects.create(
                     bundle_id=normalized_bundle_id or generate_bundle_id(),
+                    name=name or "",
                 )
                 break
             except IntegrityError:

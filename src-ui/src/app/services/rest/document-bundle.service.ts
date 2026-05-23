@@ -15,11 +15,41 @@ export class DocumentBundleService extends AbstractPaperlessService<DocumentBund
     this.resourceName = 'bundles'
   }
 
-  createFromDocuments(documentIds: number[]): Observable<DocumentBundle> {
+  createFromDocuments(
+    documentIds: number[],
+    bundleId?: string,
+    name?: string
+  ): Observable<DocumentBundle> {
     this.clearCache()
-    return this.http.post<DocumentBundle>(this.getResourceUrl(), {
+    const body: { documents: number[]; bundle_id?: string; name?: string } = {
       documents: documentIds,
-    })
+    }
+    if (bundleId !== undefined) body.bundle_id = bundleId
+    if (name !== undefined) body.name = name
+    return this.http.post<DocumentBundle>(this.getResourceUrl(), body)
+  }
+
+  suggestId(): Observable<{ bundle_id: string }> {
+    return this.http.get<{ bundle_id: string }>(
+      this.getResourceUrl(null, 'suggest_id')
+    )
+  }
+
+  createForDocument(
+    documentId: number,
+    bundleId?: string,
+    name?: string
+  ): Observable<DocumentBundle> {
+    this.clearCache()
+    const body: { document: number; bundle_id?: string; name?: string } = {
+      document: documentId,
+    }
+    if (bundleId !== undefined) body.bundle_id = bundleId
+    if (name !== undefined) body.name = name
+    return this.http.post<DocumentBundle>(
+      this.getResourceUrl(null, 'create_for_document'),
+      body
+    )
   }
 
   addDocument(
@@ -57,6 +87,23 @@ export class DocumentBundleService extends AbstractPaperlessService<DocumentBund
     this.clearCache()
     return this.http.delete<void>(
       `${this.getResourceUrl(bundleId, 'documents')}${membershipId}/`
+    )
+  }
+
+  moveDocument(
+    targetBundleId: number,
+    membershipId: number,
+    bundleItemName?: string,
+    bundleItemType?: string
+  ): Observable<DocumentBundleItem> {
+    this.clearCache()
+    return this.http.post<DocumentBundleItem>(
+      this.getResourceUrl(targetBundleId, 'move_document'),
+      {
+        membership: membershipId,
+        bundle_item_name: bundleItemName,
+        bundle_item_type: bundleItemType ?? '',
+      }
     )
   }
 

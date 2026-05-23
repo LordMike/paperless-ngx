@@ -135,11 +135,13 @@ class DocumentBundleFilterSet(FilterSet):
         field_name="bundle_id",
         lookup_expr="icontains",
     )
+    name__icontains = CharFilter(field_name="name", lookup_expr="icontains")
 
     class Meta:
         model = DocumentBundle
         fields = {
             "id": ID_KWARGS,
+            "name": CHAR_KWARGS,
             "bundle_id": CHAR_KWARGS,
             "created": DATETIME_KWARGS,
         }

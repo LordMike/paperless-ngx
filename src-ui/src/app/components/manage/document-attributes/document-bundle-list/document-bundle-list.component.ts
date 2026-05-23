@@ -42,7 +42,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
   collectionSize = 0
   sortField = 'bundle_id'
   sortReverse = false
-  bundleIdFilter = ''
+  bundleFilter = ''
 
   ngOnInit(): void {
     this.filterDebounce
@@ -52,7 +52,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
         distinctUntilChanged()
       )
       .subscribe((value) => {
-        this.bundleIdFilter = value
+        this.bundleFilter = value
         this.page = 1
         this.reloadData()
       })
@@ -68,7 +68,7 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
     this.loading = true
     this.bundleService
       .list(this.page, this.pageSize, this.sortField, this.sortReverse, {
-        bundle_id__icontains: this.bundleIdFilter,
+        bundle_id__icontains: this.bundleFilter,
       })
       .pipe(takeUntil(this.unsubscribeNotifier))
       .subscribe({
@@ -106,8 +106,10 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
       backdrop: 'static',
     })
     modal.componentInstance.bundle = bundle
-    modal.componentInstance.saved.subscribe(({ bundle_id }) => {
-      this.bundleService.patch({ ...bundle, bundle_id }).subscribe({
+    modal.componentInstance.mode = 'edit'
+    modal.componentInstance.saved.subscribe(({ name, bundle_id }) => {
+      modal.componentInstance.networkActive = true
+      this.bundleService.patch({ ...bundle, name, bundle_id }).subscribe({
         next: () => {
           modal.close()
           this.reloadData()
@@ -115,8 +117,11 @@ export class DocumentBundleListComponent implements OnInit, OnDestroy {
             $localize`Successfully updated bundle "${bundle_id}".`
           )
         },
-        error: (error) =>
-          this.toastService.showError($localize`Error updating bundle`, error),
+        error: (error) => {
+          modal.componentInstance.networkActive = false
+          modal.componentInstance.error = error?.error ?? error
+          this.toastService.showError($localize`Error updating bundle`, error)
+        },
       })
     })
   }

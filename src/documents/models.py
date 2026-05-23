@@ -520,6 +520,13 @@ class Document(SoftDeleteModel, ModelWithOwner):  # type: ignore[django-manager-
 
 
 class DocumentBundle(models.Model):
+    name = models.CharField(
+        _("name"),
+        max_length=128,
+        blank=True,
+        db_index=True,
+    )
+
     bundle_id = models.CharField(
         _("bundle id"),
         max_length=32,
@@ -549,7 +556,7 @@ class DocumentBundle(models.Model):
         verbose_name_plural = _("document bundles")
 
     def __str__(self) -> str:
-        return self.bundle_id
+        return self.name or self.bundle_id
 
     def save(self, *args, **kwargs):
         self.bundle_id = self.bundle_id.upper()
