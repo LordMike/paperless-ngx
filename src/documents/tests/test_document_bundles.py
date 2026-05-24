@@ -17,12 +17,30 @@ from documents.bundles import create_bundle
 from documents.bundles import generate_bundle_id
 from documents.bundles import remove_membership
 from documents.bundles import reorder_bundle
+from documents.bundles import update_membership
 from documents.models import DocumentBundle
 from documents.models import DocumentBundleMembership
 from documents.tests.factories import DocumentFactory
 
 
 class TestDocumentBundleModel(TestCase):
+    def _reset_modified(self, docs):
+        baseline = timezone.now() - timedelta(days=1)
+        type(docs[0]).objects.filter(pk__in=[doc.pk for doc in docs]).update(
+            modified=baseline,
+        )
+        return baseline
+
+    def _modified_values(self, docs):
+        return dict(
+            type(docs[0])
+            .objects.filter(pk__in=[doc.pk for doc in docs])
+            .values_list("pk", "modified"),
+        )
+
+    def _sent_document_ids(self, send_mock):
+        return [call.kwargs["document"].pk for call in send_mock.call_args_list]
+
     def test_create_bundle_generates_id_and_sequential_memberships(self):
         docs = [DocumentFactory(title=f"Document {i}") for i in range(3)]
 
@@ -186,11 +204,137 @@ class TestDocumentBundleModel(TestCase):
             membership_ids,
         )
 
+    def test_create_bundle_touches_documents_and_emits_updates(self):
+        docs = [DocumentFactory() for _ in range(2)]
+        baseline = self._reset_modified(docs)
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                create_bundle(items=[BundleItemInput(document=doc) for doc in docs])
+
+        self.assertTrue(
+            all(
+                modified > baseline for modified in self._modified_values(docs).values()
+            ),
+        )
+        self.assertCountEqual(self._sent_document_ids(send), [doc.pk for doc in docs])
+
+    def test_update_membership_noop_does_not_touch_documents(self):
+        docs = [DocumentFactory() for _ in range(2)]
+        bundle = create_bundle(items=[BundleItemInput(document=doc) for doc in docs])
+        baseline = self._reset_modified(docs)
+        membership = bundle.memberships.order_by("order_id").first()
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                update_membership(
+                    membership=membership,
+                    bundle_item_name=membership.bundle_item_name,
+                    bundle_item_type=membership.bundle_item_type,
+                )
+
+        self.assertEqual(
+            set(self._modified_values(docs).values()),
+            {baseline},
+        )
+        send.assert_not_called()
+
+    def test_update_membership_touches_all_bundle_documents(self):
+        docs = [DocumentFactory() for _ in range(2)]
+        bundle = create_bundle(items=[BundleItemInput(document=doc) for doc in docs])
+        baseline = self._reset_modified(docs)
+        membership = bundle.memberships.order_by("order_id").first()
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                update_membership(
+                    membership=membership,
+                    bundle_item_name="new label",
+                )
+
+        self.assertTrue(
+            all(
+                modified > baseline for modified in self._modified_values(docs).values()
+            ),
+        )
+        self.assertCountEqual(self._sent_document_ids(send), [doc.pk for doc in docs])
+
+    def test_reorder_noop_does_not_touch_documents(self):
+        docs = [DocumentFactory() for _ in range(3)]
+        bundle = create_bundle(items=[BundleItemInput(document=doc) for doc in docs])
+        membership_ids = list(
+            bundle.memberships.order_by("order_id").values_list("id", flat=True),
+        )
+        baseline = self._reset_modified(docs)
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                reorder_bundle(bundle=bundle, membership_ids=membership_ids)
+
+        self.assertEqual(
+            set(self._modified_values(docs).values()),
+            {baseline},
+        )
+        send.assert_not_called()
+
+    def test_reorder_touches_all_bundle_documents(self):
+        docs = [DocumentFactory() for _ in range(3)]
+        bundle = create_bundle(items=[BundleItemInput(document=doc) for doc in docs])
+        membership_ids = list(
+            bundle.memberships.order_by("-order_id").values_list("id", flat=True),
+        )
+        baseline = self._reset_modified(docs)
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                reorder_bundle(bundle=bundle, membership_ids=membership_ids)
+
+        self.assertTrue(
+            all(
+                modified > baseline for modified in self._modified_values(docs).values()
+            ),
+        )
+        self.assertCountEqual(self._sent_document_ids(send), [doc.pk for doc in docs])
+
+    def test_remove_membership_touches_removed_and_remaining_documents(self):
+        docs = [DocumentFactory() for _ in range(2)]
+        bundle = create_bundle(items=[BundleItemInput(document=doc) for doc in docs])
+        baseline = self._reset_modified(docs)
+        membership = bundle.memberships.get(document=docs[0])
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                remove_membership(membership)
+
+        self.assertTrue(
+            all(
+                modified > baseline for modified in self._modified_values(docs).values()
+            ),
+        )
+        self.assertCountEqual(self._sent_document_ids(send), [doc.pk for doc in docs])
+
 
 class TestDocumentBundleAPI(APITestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_superuser(username="bundle_admin")
         self.client.force_authenticate(user=self.user)
+
+    def _reset_modified(self, docs):
+        baseline = timezone.now() - timedelta(days=1)
+        type(docs[0]).objects.filter(pk__in=[doc.pk for doc in docs]).update(
+            modified=baseline,
+        )
+        return baseline
+
+    def _modified_values(self, docs):
+        return dict(
+            type(docs[0])
+            .objects.filter(pk__in=[doc.pk for doc in docs])
+            .values_list("pk", "modified"),
+        )
+
+    def _sent_document_ids(self, send_mock):
+        return [call.kwargs["document"].pk for call in send_mock.call_args_list]
 
     def test_document_detail_and_list_include_bundle(self):
         docs = [
@@ -312,3 +456,73 @@ class TestDocumentBundleAPI(APITestCase):
         self.assertEqual(created.data["name"], "New package")
         self.assertEqual(created.data["items"][0]["document"], docs[0].pk)
         self.assertEqual(target.memberships.count(), 1)
+
+    def test_bundle_patch_noop_does_not_touch_documents(self):
+        docs = [DocumentFactory(title="A"), DocumentFactory(title="B")]
+        bundle = create_bundle(
+            items=[BundleItemInput(document=doc) for doc in docs],
+            bundle_id="A94",
+            name="Package",
+        )
+        baseline = self._reset_modified(docs)
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(
+                    f"/api/bundles/{bundle.pk}/",
+                    {"bundle_id": "A94", "name": "Package"},
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(self._modified_values(docs).values()), {baseline})
+        send.assert_not_called()
+
+    def test_bundle_patch_touches_all_documents_when_display_changes(self):
+        docs = [DocumentFactory(title="A"), DocumentFactory(title="B")]
+        bundle = create_bundle(
+            items=[BundleItemInput(document=doc) for doc in docs],
+            bundle_id="A95",
+            name="Package",
+        )
+        baseline = self._reset_modified(docs)
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(
+                    f"/api/bundles/{bundle.pk}/",
+                    {"name": "Updated package"},
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            all(
+                modified > baseline for modified in self._modified_values(docs).values()
+            ),
+        )
+        self.assertCountEqual(self._sent_document_ids(send), [doc.pk for doc in docs])
+
+    def test_bundle_delete_touches_former_documents_without_deleting_them(self):
+        docs = [DocumentFactory(title="A"), DocumentFactory(title="B")]
+        bundle = create_bundle(
+            items=[BundleItemInput(document=doc) for doc in docs],
+            bundle_id="A96",
+        )
+        baseline = self._reset_modified(docs)
+
+        with mock.patch("documents.bundles.document_updated.send") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.delete(f"/api/bundles/{bundle.pk}/")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(DocumentBundle.objects.filter(pk=bundle.pk).exists())
+        self.assertTrue(
+            all(type(docs[0]).objects.filter(pk=doc.pk).exists() for doc in docs),
+        )
+        self.assertTrue(
+            all(
+                modified > baseline for modified in self._modified_values(docs).values()
+            ),
+        )
+        self.assertCountEqual(self._sent_document_ids(send), [doc.pk for doc in docs])

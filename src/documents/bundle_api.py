@@ -35,6 +35,7 @@ from documents.bundles import generate_bundle_id
 from documents.bundles import normalize_bundle_id
 from documents.bundles import remove_membership
 from documents.bundles import reorder_bundle
+from documents.bundles import touch_bundle_documents
 from documents.bundles import update_membership
 from documents.bundles import visible_documents_queryset
 from documents.filters import CHAR_KWARGS
@@ -211,15 +212,18 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         update_fields = []
-        if "name" in validated_data:
+        if "name" in validated_data and validated_data["name"] != instance.name:
             instance.name = validated_data["name"]
             update_fields.append("name")
         bundle_id = validated_data.get("bundle_id")
-        if bundle_id is not None:
+        if bundle_id is not None and bundle_id != instance.bundle_id:
             instance.bundle_id = bundle_id
             update_fields.append("bundle_id")
         if update_fields:
             instance.save(update_fields=update_fields)
+            touch_bundle_documents(
+                instance.memberships.values_list("document_id", flat=True),
+            )
         return instance
 
 
@@ -451,7 +455,9 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
     def destroy(self, request, *args, **kwargs):
         bundle = self.get_object()
         self._check_change_bundle(bundle)
+        document_ids = list(bundle.memberships.values_list("document_id", flat=True))
         bundle.delete()
+        touch_bundle_documents(document_ids)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=["post"], detail=True, url_path="documents")
@@ -491,9 +497,16 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
                     .filter(document=document)
                     .first()
                 )
+                touch_document_ids = {document.pk}
                 if membership:
                     assert_can_change_bundle(request.user, membership.bundle)
-                    remove_membership(membership)
+                    touch_document_ids.update(
+                        membership.bundle.memberships.values_list(
+                            "document_id",
+                            flat=True,
+                        ),
+                    )
+                    remove_membership(membership, touch_documents=False)
                 bundle = create_bundle(
                     items=[
                         BundleItemInput(
@@ -508,7 +521,9 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
                     ],
                     bundle_id=serializer.validated_data.get("bundle_id") or None,
                     name=serializer.validated_data.get("name"),
+                    touch_documents=False,
                 )
+                touch_bundle_documents(touch_document_ids)
         except PermissionError:
             self._raise_permission_error()
         except DjangoValidationError as e:
@@ -533,6 +548,9 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
             document = membership.document
             assert_can_change_documents(request.user, [document])
             with transaction.atomic():
+                touch_document_ids = set(
+                    source_bundle.memberships.values_list("document_id", flat=True),
+                )
                 bundle_item_name = serializer.validated_data.get(
                     "bundle_item_name",
                     membership.bundle_item_name,
@@ -541,13 +559,18 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
                     "bundle_item_type",
                     membership.bundle_item_type,
                 )
-                remove_membership(membership)
+                remove_membership(membership, touch_documents=False)
                 new_membership = add_document_to_bundle(
                     bundle=target_bundle,
                     document=document,
                     bundle_item_name=bundle_item_name,
                     bundle_item_type=bundle_item_type,
+                    touch_documents=False,
                 )
+                touch_document_ids.update(
+                    target_bundle.memberships.values_list("document_id", flat=True),
+                )
+                touch_bundle_documents(touch_document_ids)
         except PermissionError:
             self._raise_permission_error()
         except DjangoValidationError as e:

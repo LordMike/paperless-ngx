@@ -8,12 +8,14 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db import transaction
 from django.db.models import Max
+from django.utils import timezone
 
 from documents.models import Document
 from documents.models import DocumentBundle
 from documents.models import DocumentBundleMembership
 from documents.permissions import get_objects_for_user_owner_aware
 from documents.permissions import has_perms_owner_aware
+from documents.signals import document_updated
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -141,11 +143,38 @@ def _validate_documents_are_unbundled(documents: Iterable[Document]) -> None:
         )
 
 
+def _bundle_document_ids(bundle: DocumentBundle) -> list[int]:
+    return list(
+        DocumentBundleMembership.objects.filter(bundle=bundle)
+        .order_by("order_id")
+        .values_list("document_id", flat=True),
+    )
+
+
+def touch_bundle_documents(document_ids: Iterable[int]) -> None:
+    touched_ids = sorted({document_id for document_id in document_ids if document_id})
+    if not touched_ids:
+        return
+
+    Document.objects.filter(pk__in=touched_ids).update(modified=timezone.now())
+
+    def send_document_updated_events() -> None:
+        documents = Document.objects.filter(pk__in=touched_ids)
+        documents_by_id = {document.pk: document for document in documents}
+        for document_id in touched_ids:
+            document = documents_by_id.get(document_id)
+            if document is not None:
+                document_updated.send(sender=DocumentBundle, document=document)
+
+    transaction.on_commit(send_document_updated_events)
+
+
 def create_bundle(
     *,
     items: Iterable[BundleItemInput],
     bundle_id: str | None = None,
     name: str | None = None,
+    touch_documents: bool = True,
 ) -> DocumentBundle:
     items = _coerce_items(items)
     _validate_documents_are_unbundled(item.document for item in items)
@@ -179,6 +208,8 @@ def create_bundle(
             for index, item in enumerate(items, start=1)
         ]
         DocumentBundleMembership.objects.bulk_create(memberships)
+        if touch_documents:
+            touch_bundle_documents(item.document.pk for item in items)
         return bundle
 
 
@@ -188,6 +219,7 @@ def add_document_to_bundle(
     document: Document,
     bundle_item_name: str | None = None,
     bundle_item_type: str | None = None,
+    touch_documents: bool = True,
 ) -> DocumentBundleMembership:
     _validate_documents_are_unbundled([document])
     with transaction.atomic():
@@ -197,13 +229,16 @@ def add_document_to_bundle(
             )["max_order"]
             or 0
         ) + 1
-        return DocumentBundleMembership.objects.create(
+        membership = DocumentBundleMembership.objects.create(
             bundle=bundle,
             document=document,
             order_id=next_order_id,
             bundle_item_name=bundle_item_name or default_bundle_item_name(document),
             bundle_item_type=bundle_item_type or "",
         )
+        if touch_documents:
+            touch_bundle_documents(_bundle_document_ids(bundle))
+        return membership
 
 
 def update_membership(
@@ -211,16 +246,19 @@ def update_membership(
     membership: DocumentBundleMembership,
     bundle_item_name: str | None = None,
     bundle_item_type: str | None = None,
+    touch_documents: bool = True,
 ) -> DocumentBundleMembership:
     update_fields = []
-    if bundle_item_name is not None:
+    if bundle_item_name is not None and bundle_item_name != membership.bundle_item_name:
         membership.bundle_item_name = bundle_item_name
         update_fields.append("bundle_item_name")
-    if bundle_item_type is not None:
+    if bundle_item_type is not None and bundle_item_type != membership.bundle_item_type:
         membership.bundle_item_type = bundle_item_type
         update_fields.append("bundle_item_type")
     if update_fields:
         membership.save(update_fields=update_fields)
+        if touch_documents:
+            touch_bundle_documents(_bundle_document_ids(membership.bundle))
     return membership
 
 
@@ -228,6 +266,7 @@ def reorder_bundle(
     *,
     bundle: DocumentBundle,
     membership_ids: list[int],
+    touch_documents: bool = True,
 ) -> None:
     with transaction.atomic():
         memberships = list(
@@ -240,6 +279,8 @@ def reorder_bundle(
             raise ValidationError(
                 "Reorder payload must include every bundle item once.",
             )
+        if current_ids == membership_ids:
+            return
 
         by_id = {membership.pk: membership for membership in memberships}
         offset = max((membership.order_id for membership in memberships), default=0)
@@ -250,22 +291,33 @@ def reorder_bundle(
             membership = by_id[membership_id]
             membership.order_id = order_id
             membership.save(update_fields=["order_id"])
+        if touch_documents:
+            touch_bundle_documents(membership.document_id for membership in memberships)
 
 
-def remove_membership(membership: DocumentBundleMembership) -> None:
+def remove_membership(
+    membership: DocumentBundleMembership,
+    *,
+    touch_documents: bool = True,
+) -> None:
     bundle = membership.bundle
     with transaction.atomic():
+        touched_document_ids = _bundle_document_ids(bundle)
         membership.delete()
         remaining = list(
             DocumentBundleMembership.objects.filter(bundle=bundle).order_by("order_id"),
         )
         if not remaining:
             bundle.delete()
+            if touch_documents:
+                touch_bundle_documents(touched_document_ids)
             return
         for order_id, remaining_membership in enumerate(remaining, start=1):
             if remaining_membership.order_id != order_id:
                 remaining_membership.order_id = order_id
                 remaining_membership.save(update_fields=["order_id"])
+        if touch_documents:
+            touch_bundle_documents(touched_document_ids)
 
 
 def remove_document_from_all_bundles(document: Document) -> None:
@@ -274,8 +326,15 @@ def remove_document_from_all_bundles(document: Document) -> None:
             document=document,
         ),
     )
+    touched_document_ids = set()
     for membership in memberships:
-        remove_membership(membership)
+        touched_document_ids.update(
+            document_id
+            for document_id in _bundle_document_ids(membership.bundle)
+            if document_id != document.pk
+        )
+        remove_membership(membership, touch_documents=False)
+    touch_bundle_documents(touched_document_ids)
 
 
 def create_bundle_from_task_results(
