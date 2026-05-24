@@ -82,7 +82,7 @@ describe('DocumentBundleService', () => {
     expect(req.request.method).toBe('PATCH')
     expect(req.request.body).toEqual({
       bundle_item_name: 'terms',
-      bundle_item_type: 'appendix',
+      bundle_item_relationship: 'appendix',
     })
     req.flush({})
   })
@@ -107,7 +107,7 @@ describe('DocumentBundleService', () => {
     expect(req.request.body).toEqual({
       membership: 9,
       bundle_item_name: 'schedule',
-      bundle_item_type: 'cover letter',
+      bundle_item_relationship: 'cover letter',
     })
     req.flush({})
   })

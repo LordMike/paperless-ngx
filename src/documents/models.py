@@ -589,8 +589,8 @@ class DocumentBundleMembership(models.Model):
         blank=True,
     )
 
-    bundle_item_type = models.CharField(
-        _("bundle item type"),
+    bundle_item_relationship = models.CharField(
+        _("bundle item relationship"),
         max_length=128,
         blank=True,
     )

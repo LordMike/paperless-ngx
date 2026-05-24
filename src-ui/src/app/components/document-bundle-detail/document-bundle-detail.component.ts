@@ -82,17 +82,17 @@ export class DocumentBundleDetailComponent implements OnInit {
     modal.componentInstance.saved.subscribe(
       ({
         bundle_item_name,
-        bundle_item_type,
+        bundle_item_relationship,
       }: {
         bundle_item_name: string
-        bundle_item_type: string
+        bundle_item_relationship: string
       }) => {
         this.bundleService
           .updateMembership(
             this.bundle.id,
             item.id,
             bundle_item_name,
-            bundle_item_type
+            bundle_item_relationship
           )
           .subscribe({
             next: () => {

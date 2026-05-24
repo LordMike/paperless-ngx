@@ -54,9 +54,9 @@
                   <a routerLink="/documents/{{ item.document }}">{{
                     item.bundle_item_name
                   }}</a>
-                  @if (item.bundle_item_type) {
+                  @if (item.bundle_item_relationship) {
                     <div class="small text-muted">
-                      {{ item.bundle_item_type }}
+                      {{ item.bundle_item_relationship }}
                     </div>
                   }
                 </div>

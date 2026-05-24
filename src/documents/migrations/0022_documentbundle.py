@@ -94,11 +94,11 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "bundle_item_type",
+                    "bundle_item_relationship",
                     models.CharField(
                         blank=True,
                         max_length=128,
-                        verbose_name="bundle item type",
+                        verbose_name="bundle item relationship",
                     ),
                 ),
                 (

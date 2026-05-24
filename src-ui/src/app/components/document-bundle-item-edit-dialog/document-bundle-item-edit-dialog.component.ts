@@ -22,20 +22,20 @@ export class DocumentBundleItemEditDialogComponent {
   @Output()
   saved = new EventEmitter<{
     bundle_item_name: string
-    bundle_item_type: string
+    bundle_item_relationship: string
   }>()
 
   closeEnabled = false
 
   itemForm = new FormGroup({
     bundle_item_name: new FormControl(''),
-    bundle_item_type: new FormControl(''),
+    bundle_item_relationship: new FormControl(''),
   })
 
   ngOnInit(): void {
     this.itemForm.patchValue({
       bundle_item_name: this.item?.bundle_item_name ?? '',
-      bundle_item_type: this.item?.bundle_item_type ?? '',
+      bundle_item_relationship: this.item?.bundle_item_relationship ?? '',
     })
     setTimeout(() => {
       this.closeEnabled = true
@@ -45,7 +45,8 @@ export class DocumentBundleItemEditDialogComponent {
   save(): void {
     this.saved.emit({
       bundle_item_name: this.itemForm.value.bundle_item_name ?? '',
-      bundle_item_type: this.itemForm.value.bundle_item_type ?? '',
+      bundle_item_relationship:
+        this.itemForm.value.bundle_item_relationship ?? '',
     })
   }
 

@@ -43,15 +43,15 @@ export class DocumentBundleTabComponent
   bundles: DocumentBundle[] = []
   selectedBundleId: number | null
   bundleItemName = ''
-  bundleItemType = ''
+  bundleItemRelationship = ''
   bundleItemNameOriginal = ''
-  bundleItemTypeOriginal = ''
+  bundleItemRelationshipOriginal = ''
   bundleMembershipSaving = false
 
   get bundleMembershipDirty(): boolean {
     return (
       this.bundleItemName !== this.bundleItemNameOriginal ||
-      this.bundleItemType !== this.bundleItemTypeOriginal
+      this.bundleItemRelationship !== this.bundleItemRelationshipOriginal
     )
   }
 
@@ -116,13 +116,13 @@ export class DocumentBundleTabComponent
         this.document.bundle.id,
         this.document.bundle.current_membership_id,
         this.bundleItemName,
-        this.bundleItemType
+        this.bundleItemRelationship
       )
       .pipe(first())
       .subscribe({
         next: () => {
           this.bundleItemNameOriginal = this.bundleItemName
-          this.bundleItemTypeOriginal = this.bundleItemType
+          this.bundleItemRelationshipOriginal = this.bundleItemRelationship
           this.bundleMembershipSaving = false
           this.bundleChanged.emit()
         },
@@ -135,7 +135,7 @@ export class DocumentBundleTabComponent
 
   discardBundleMembershipChanges() {
     this.bundleItemName = this.bundleItemNameOriginal
-    this.bundleItemType = this.bundleItemTypeOriginal
+    this.bundleItemRelationship = this.bundleItemRelationshipOriginal
   }
 
   createBundleForCurrentDocument() {
@@ -151,9 +151,10 @@ export class DocumentBundleTabComponent
   private syncFromDocument() {
     this.selectedBundleId = this.document?.bundle?.id ?? null
     this.bundleItemName = this.document?.bundle?.current_bundle_item_name ?? ''
-    this.bundleItemType = this.document?.bundle?.current_bundle_item_type ?? ''
+    this.bundleItemRelationship =
+      this.document?.bundle?.current_bundle_item_relationship ?? ''
     this.bundleItemNameOriginal = this.bundleItemName
-    this.bundleItemTypeOriginal = this.bundleItemType
+    this.bundleItemRelationshipOriginal = this.bundleItemRelationship
   }
 
   private confirmMoveToBundle(bundleId: number) {
@@ -178,7 +179,7 @@ export class DocumentBundleTabComponent
           targetBundle.id,
           sourceBundle.current_membership_id,
           sourceBundle.current_bundle_item_name,
-          sourceBundle.current_bundle_item_type
+          sourceBundle.current_bundle_item_relationship
         )
         .pipe(first())
         .subscribe({

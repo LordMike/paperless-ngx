@@ -91,7 +91,7 @@ class DocumentBundleItemSummarySerializer(serializers.Serializer[dict[str, Any]]
     document = serializers.IntegerField()
     order_id = serializers.IntegerField()
     bundle_item_name = serializers.CharField()
-    bundle_item_type = serializers.CharField()
+    bundle_item_relationship = serializers.CharField()
     created = serializers.DateTimeField()
     title = serializers.CharField(allow_blank=True)
 
@@ -103,7 +103,7 @@ class DocumentBundleSummarySerializer(serializers.Serializer[dict[str, Any]]):
     current_membership_id = serializers.IntegerField()
     current_order_id = serializers.IntegerField()
     current_bundle_item_name = serializers.CharField()
-    current_bundle_item_type = serializers.CharField()
+    current_bundle_item_relationship = serializers.CharField()
     current_membership_created = serializers.DateTimeField()
     items = DocumentBundleItemSummarySerializer(many=True)
 
@@ -119,7 +119,7 @@ class DocumentBundleMembershipSerializer(serializers.ModelSerializer):
             "document_title",
             "order_id",
             "bundle_item_name",
-            "bundle_item_type",
+            "bundle_item_relationship",
             "created",
         )
         read_only_fields = ("id", "order_id", "created", "document_title")
@@ -132,7 +132,7 @@ class DocumentBundleCreateItemSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=256,
     )
-    bundle_item_type = serializers.CharField(
+    bundle_item_relationship = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=128,
@@ -198,7 +198,7 @@ class DocumentBundleSerializer(serializers.ModelSerializer):
                 BundleItemInput(
                     document=item["document"],
                     bundle_item_name=item.get("bundle_item_name"),
-                    bundle_item_type=item.get("bundle_item_type"),
+                    bundle_item_relationship=item.get("bundle_item_relationship"),
                 )
                 for item in create_items
             ]
@@ -234,7 +234,7 @@ class DocumentBundleAddDocumentSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=256,
     )
-    bundle_item_type = serializers.CharField(
+    bundle_item_relationship = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=128,
@@ -250,7 +250,7 @@ class DocumentBundleCreateForDocumentSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=256,
     )
-    bundle_item_type = serializers.CharField(
+    bundle_item_relationship = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=128,
@@ -276,7 +276,7 @@ class DocumentBundleMoveDocumentSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=256,
     )
-    bundle_item_type = serializers.CharField(
+    bundle_item_relationship = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=128,
@@ -289,7 +289,7 @@ class DocumentBundleMembershipUpdateSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=256,
     )
-    bundle_item_type = serializers.CharField(
+    bundle_item_relationship = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=128,
@@ -360,7 +360,7 @@ def serialize_document_bundle(document: Document, user) -> dict[str, Any] | None
             "document": item.document_id,
             "order_id": item.order_id,
             "bundle_item_name": item.bundle_item_name,
-            "bundle_item_type": item.bundle_item_type,
+            "bundle_item_relationship": item.bundle_item_relationship,
             "created": item.created,
             "title": item.document.title,
         }
@@ -374,7 +374,7 @@ def serialize_document_bundle(document: Document, user) -> dict[str, Any] | None
         "current_membership_id": membership.id,
         "current_order_id": membership.order_id,
         "current_bundle_item_name": membership.bundle_item_name,
-        "current_bundle_item_type": membership.bundle_item_type,
+        "current_bundle_item_relationship": membership.bundle_item_relationship,
         "current_membership_created": membership.created,
         "items": items,
     }
@@ -473,7 +473,9 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
                 bundle=bundle,
                 document=document,
                 bundle_item_name=serializer.validated_data.get("bundle_item_name"),
-                bundle_item_type=serializer.validated_data.get("bundle_item_type"),
+                bundle_item_relationship=serializer.validated_data.get(
+                    "bundle_item_relationship",
+                ),
             )
         except PermissionError:
             self._raise_permission_error()
@@ -514,8 +516,8 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
                             bundle_item_name=serializer.validated_data.get(
                                 "bundle_item_name",
                             ),
-                            bundle_item_type=serializer.validated_data.get(
-                                "bundle_item_type",
+                            bundle_item_relationship=serializer.validated_data.get(
+                                "bundle_item_relationship",
                             ),
                         ),
                     ],
@@ -555,16 +557,16 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
                     "bundle_item_name",
                     membership.bundle_item_name,
                 )
-                bundle_item_type = serializer.validated_data.get(
-                    "bundle_item_type",
-                    membership.bundle_item_type,
+                bundle_item_relationship = serializer.validated_data.get(
+                    "bundle_item_relationship",
+                    membership.bundle_item_relationship,
                 )
                 remove_membership(membership, touch_documents=False)
                 new_membership = add_document_to_bundle(
                     bundle=target_bundle,
                     document=document,
                     bundle_item_name=bundle_item_name,
-                    bundle_item_type=bundle_item_type,
+                    bundle_item_relationship=bundle_item_relationship,
                     touch_documents=False,
                 )
                 touch_document_ids.update(
@@ -599,7 +601,9 @@ class DocumentBundleViewSet(ModelViewSet[DocumentBundle]):
         membership = update_membership(
             membership=membership,
             bundle_item_name=serializer.validated_data.get("bundle_item_name"),
-            bundle_item_type=serializer.validated_data.get("bundle_item_type"),
+            bundle_item_relationship=serializer.validated_data.get(
+                "bundle_item_relationship",
+            ),
         )
         return Response(DocumentBundleMembershipSerializer(membership).data)
 

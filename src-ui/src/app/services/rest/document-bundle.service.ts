@@ -71,14 +71,14 @@ export class DocumentBundleService extends AbstractPaperlessService<DocumentBund
     bundleId: number,
     membershipId: number,
     bundleItemName: string,
-    bundleItemType?: string
+    bundleItemRelationship?: string
   ): Observable<DocumentBundleItem> {
     this.clearCache()
     return this.http.patch<DocumentBundleItem>(
       `${this.getResourceUrl(bundleId, 'documents')}${membershipId}/`,
       {
         bundle_item_name: bundleItemName,
-        bundle_item_type: bundleItemType ?? '',
+        bundle_item_relationship: bundleItemRelationship ?? '',
       }
     )
   }
@@ -94,7 +94,7 @@ export class DocumentBundleService extends AbstractPaperlessService<DocumentBund
     targetBundleId: number,
     membershipId: number,
     bundleItemName?: string,
-    bundleItemType?: string
+    bundleItemRelationship?: string
   ): Observable<DocumentBundleItem> {
     this.clearCache()
     return this.http.post<DocumentBundleItem>(
@@ -102,7 +102,7 @@ export class DocumentBundleService extends AbstractPaperlessService<DocumentBund
       {
         membership: membershipId,
         bundle_item_name: bundleItemName,
-        bundle_item_type: bundleItemType ?? '',
+        bundle_item_relationship: bundleItemRelationship ?? '',
       }
     )
   }

@@ -32,7 +32,7 @@ BUNDLE_ID_GENERATED_SUFFIX_CHARS = set(string.digits + string.ascii_uppercase)
 class BundleItemInput:
     document: Document
     bundle_item_name: str | None = None
-    bundle_item_type: str | None = None
+    bundle_item_relationship: str | None = None
 
 
 def normalize_bundle_id(bundle_id: str) -> str:
@@ -203,7 +203,7 @@ def create_bundle(
                 bundle_item_name=(
                     item.bundle_item_name or default_bundle_item_name(item.document)
                 ),
-                bundle_item_type=item.bundle_item_type or "",
+                bundle_item_relationship=item.bundle_item_relationship or "",
             )
             for index, item in enumerate(items, start=1)
         ]
@@ -218,7 +218,7 @@ def add_document_to_bundle(
     bundle: DocumentBundle,
     document: Document,
     bundle_item_name: str | None = None,
-    bundle_item_type: str | None = None,
+    bundle_item_relationship: str | None = None,
     touch_documents: bool = True,
 ) -> DocumentBundleMembership:
     _validate_documents_are_unbundled([document])
@@ -234,7 +234,7 @@ def add_document_to_bundle(
             document=document,
             order_id=next_order_id,
             bundle_item_name=bundle_item_name or default_bundle_item_name(document),
-            bundle_item_type=bundle_item_type or "",
+            bundle_item_relationship=bundle_item_relationship or "",
         )
         if touch_documents:
             touch_bundle_documents(_bundle_document_ids(bundle))
@@ -245,16 +245,19 @@ def update_membership(
     *,
     membership: DocumentBundleMembership,
     bundle_item_name: str | None = None,
-    bundle_item_type: str | None = None,
+    bundle_item_relationship: str | None = None,
     touch_documents: bool = True,
 ) -> DocumentBundleMembership:
     update_fields = []
     if bundle_item_name is not None and bundle_item_name != membership.bundle_item_name:
         membership.bundle_item_name = bundle_item_name
         update_fields.append("bundle_item_name")
-    if bundle_item_type is not None and bundle_item_type != membership.bundle_item_type:
-        membership.bundle_item_type = bundle_item_type
-        update_fields.append("bundle_item_type")
+    if (
+        bundle_item_relationship is not None
+        and bundle_item_relationship != membership.bundle_item_relationship
+    ):
+        membership.bundle_item_relationship = bundle_item_relationship
+        update_fields.append("bundle_item_relationship")
     if update_fields:
         membership.save(update_fields=update_fields)
         if touch_documents:

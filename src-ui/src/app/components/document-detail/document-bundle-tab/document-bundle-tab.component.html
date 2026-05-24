@@ -47,12 +47,12 @@
           </td>
         </tr>
         <tr>
-          <td i18n>Type</td>
+          <td i18n>Relationship</td>
           <td>
             <input
-              id="documentBundleItemType"
+              id="documentBundleItemRelationship"
               class="form-control"
-              [(ngModel)]="bundleItemType"
+              [(ngModel)]="bundleItemRelationship"
               [ngModelOptions]="{ standalone: true }"
               [disabled]="!userCanEdit || bundleMembershipSaving"
               placeholder="cover letter"
@@ -111,7 +111,7 @@
         <thead>
           <tr>
             <th i18n>Name</th>
-            <th class="d-none d-sm-table-cell" i18n>Type</th>
+            <th class="d-none d-sm-table-cell" i18n>Relationship</th>
             <th i18n>Document</th>
           </tr>
         </thead>
@@ -124,7 +124,7 @@
                 }}</a>
               </td>
               <td class="d-none d-sm-table-cell">
-                {{ item.bundle_item_type || '-' }}
+                {{ item.bundle_item_relationship || '-' }}
               </td>
               <td>{{ item.title || item.document }}</td>
             </tr>

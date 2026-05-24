@@ -230,7 +230,7 @@ class TestDocumentBundleModel(TestCase):
                 update_membership(
                     membership=membership,
                     bundle_item_name=membership.bundle_item_name,
-                    bundle_item_type=membership.bundle_item_type,
+                    bundle_item_relationship=membership.bundle_item_relationship,
                 )
 
         self.assertEqual(

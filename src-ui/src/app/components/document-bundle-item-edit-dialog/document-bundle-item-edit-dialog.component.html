@@ -1,20 +1,49 @@
 <form [formGroup]="itemForm" (ngSubmit)="save()" autocomplete="off">
   <div class="modal-header">
     <h4 class="modal-title" i18n>Edit bundle item</h4>
-    <button type="button" [disabled]="!closeEnabled" class="btn-close" aria-label="Close" (click)="close()"></button>
+    <button
+      type="button"
+      [disabled]="!closeEnabled"
+      class="btn-close"
+      aria-label="Close"
+      (click)="close()"
+    ></button>
   </div>
   <div class="modal-body">
     <div class="mb-3">
-      <label class="form-label" for="bundleItemName" i18n>Bundle item name</label>
-      <input id="bundleItemName" class="form-control" formControlName="bundle_item_name" autocomplete="off">
+      <label class="form-label" for="bundleItemName" i18n
+        >Bundle item name</label
+      >
+      <input
+        id="bundleItemName"
+        class="form-control"
+        formControlName="bundle_item_name"
+        autocomplete="off"
+      />
     </div>
     <div class="mb-3">
-      <label class="form-label" for="bundleItemType" i18n>Bundle type</label>
-      <input id="bundleItemType" class="form-control" formControlName="bundle_item_type" autocomplete="off" placeholder="cover letter" i18n-placeholder>
+      <label class="form-label" for="bundleItemRelationship" i18n
+        >Bundle relationship</label
+      >
+      <input
+        id="bundleItemRelationship"
+        class="form-control"
+        formControlName="bundle_item_relationship"
+        autocomplete="off"
+        placeholder="cover letter"
+        i18n-placeholder
+      />
     </div>
   </div>
   <div class="modal-footer">
-    <button type="button" class="btn btn-outline-secondary" (click)="close()" i18n>Cancel</button>
+    <button
+      type="button"
+      class="btn btn-outline-secondary"
+      (click)="close()"
+      i18n
+    >
+      Cancel
+    </button>
     <button type="submit" class="btn btn-primary" i18n>Save</button>
   </div>
 </form>
