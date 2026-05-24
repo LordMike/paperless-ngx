@@ -124,6 +124,8 @@ import { ShareLinksDialogComponent } from '../common/share-links-dialog/share-li
 import { SuggestionsDropdownComponent } from '../common/suggestions-dropdown/suggestions-dropdown.component'
 import { DocumentNotesComponent } from '../document-notes/document-notes.component'
 import { ComponentWithPermissions } from '../with-permissions/with-permissions.component'
+import { DocumentBundleMenuComponent } from './document-bundle-menu/document-bundle-menu.component'
+import { DocumentBundleTabComponent } from './document-bundle-tab/document-bundle-tab.component'
 import { DocumentHistoryComponent } from './document-history/document-history.component'
 import { DocumentVersionDropdownComponent } from './document-version-dropdown/document-version-dropdown.component'
 import { MetadataCollapseComponent } from './metadata-collapse/metadata-collapse.component'
@@ -132,11 +134,12 @@ enum DocumentDetailNavIDs {
   Details = 1,
   Content = 2,
   Metadata = 3,
-  Preview = 4,
-  Notes = 5,
-  Permissions = 6,
-  History = 7,
-  Duplicates = 8,
+  Bundle = 4,
+  Preview = 5,
+  Notes = 6,
+  Permissions = 7,
+  History = 8,
+  Duplicates = 9,
 }
 
 enum ContentRenderType {
@@ -189,6 +192,8 @@ interface IncomingDocumentUpdate {
     RouterModule,
     PngxPdfViewerComponent,
     DocumentVersionDropdownComponent,
+    DocumentBundleMenuComponent,
+    DocumentBundleTabComponent,
   ],
 })
 export class DocumentDetailComponent
@@ -703,6 +708,10 @@ export class DocumentDetailComponent
     this.toastService.showInfo($localize`Document reloaded.`)
   }
 
+  onBundleChanged() {
+    this.reloadRemoteVersion()
+  }
+
   ngOnInit(): void {
     this.setZoom(
       this.settings.get(SETTINGS_KEYS.PDF_VIEWER_ZOOM_SETTING) as PdfZoomScale
@@ -899,6 +908,9 @@ export class DocumentDetailComponent
       this.activeNavID === DocumentDetailNavIDs.Duplicates &&
       !doc?.duplicate_documents?.length
     ) {
+      this.activeNavID = DocumentDetailNavIDs.Details
+    }
+    if (this.activeNavID === DocumentDetailNavIDs.Bundle && !doc) {
       this.activeNavID = DocumentDetailNavIDs.Details
     }
   }

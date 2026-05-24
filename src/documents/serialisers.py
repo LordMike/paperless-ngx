@@ -54,6 +54,9 @@ if settings.AUDIT_LOG_ENABLED:
 
 
 from documents import bulk_edit
+from documents.bundle_api import DocumentBundleSummarySerializer
+from documents.bundle_api import bundle_membership_prefetch
+from documents.bundle_api import serialize_document_bundle
 from documents.data_models import DocumentSource
 from documents.filters import CustomFieldQueryParser
 from documents.models import Correspondent
@@ -1001,6 +1004,7 @@ class DocumentSerializer(
     created_date = serializers.DateField(required=False)
     page_count = SerializerMethodField()
     duplicate_documents = SerializerMethodField()
+    bundle = SerializerMethodField()
 
     notes = NotesSerializer(many=True, required=False, read_only=True)
     root_document: RelatedField[Document, Document, Any] | ManyRelatedField = (
@@ -1029,6 +1033,12 @@ class DocumentSerializer(
 
     def get_page_count(self, obj) -> int | None:
         return obj.page_count
+
+    @extend_schema_field(DocumentBundleSummarySerializer(allow_null=True))
+    def get_bundle(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return serialize_document_bundle(obj, user)
 
     @extend_schema_field(DuplicateDocumentSummarySerializer(many=True))
     def get_duplicate_documents(self, obj):
@@ -1254,6 +1264,7 @@ class DocumentSerializer(
             "mime_type",
             "root_document",
             "versions",
+            "bundle",
         )
         list_serializer_class = OwnedObjectListSerializer
 
@@ -1286,7 +1297,12 @@ class SearchResultSerializer(DocumentSerializer):
                 "document_type",
                 "owner",
             )
-            .prefetch_related("tags", "custom_fields", "notes")
+            .prefetch_related(
+                "tags",
+                "custom_fields",
+                "notes",
+                bundle_membership_prefetch(),
+            )
             .filter(id__in=ids)
         }
 

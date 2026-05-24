@@ -1,4 +1,5 @@
 import { CustomFieldInstance } from './custom-field-instance'
+import { DocumentBundleSummary } from './document-bundle'
 import { DocumentNote } from './document-note'
 import { ObjectWithPermissions } from './object-with-permissions'
 
@@ -164,6 +165,8 @@ export interface Document extends ObjectWithPermissions {
   // Versioning
   root_document?: number
   versions?: DocumentVersionInfo[]
+
+  bundle?: DocumentBundleSummary
 
   // Frontend only
   __changedFields?: string[]

@@ -244,6 +244,7 @@ def apply_mail_action(
     message_uid: str,
     message_subject: str,
     message_date: datetime.datetime,
+    bundle_item_names: list[str] | None = None,
 ) -> None:
     """
     This shared task applies the mail action of a particular mail rule to the
@@ -259,6 +260,14 @@ def apply_mail_action(
         message_date = make_aware(message_date)
 
     try:
+        if rule.bundle_documents and bundle_item_names:
+            from documents.bundles import create_bundle_from_task_results
+
+            create_bundle_from_task_results(
+                task_results=result,
+                bundle_item_names=bundle_item_names,
+            )
+
         with get_mailbox(
             server=account.imap_server,
             port=account.imap_port,
@@ -336,6 +345,7 @@ def queue_consumption_tasks(
     consume_tasks: list[Signature],
     rule: MailRule,
     message: MailMessage,
+    bundle_item_names: list[str] | None = None,
 ) -> None:
     """
     Queue a list of consumption tasks (Signatures for the consume_file shared
@@ -347,6 +357,7 @@ def queue_consumption_tasks(
         message_uid=message.uid,
         message_subject=message.subject,
         message_date=message.date,
+        bundle_item_names=bundle_item_names,
     )
     chord(header=consume_tasks, body=mail_action_task).on_error(
         error_callback.s(
@@ -734,6 +745,51 @@ class MailAccountHandler(LoggingMixin):
         tag_ids: list[int] = [tag.id for tag in rule.assign_tags.all()]
         doc_type = rule.assign_document_type
 
+        if rule.bundle_documents:
+            consume_tasks = []
+            bundle_item_names = []
+
+            if (
+                rule.consumption_scope == MailRule.ConsumptionScope.EML_ONLY
+                or rule.consumption_scope == MailRule.ConsumptionScope.EVERYTHING
+            ):
+                eml_count, eml_tasks, eml_names = self._process_eml(
+                    message,
+                    rule,
+                    tag_ids,
+                    doc_type,
+                    queue_tasks=False,
+                )
+                processed_elements += eml_count
+                consume_tasks.extend(eml_tasks)
+                bundle_item_names.extend(eml_names)
+
+            if (
+                rule.consumption_scope == MailRule.ConsumptionScope.ATTACHMENTS_ONLY
+                or rule.consumption_scope == MailRule.ConsumptionScope.EVERYTHING
+            ):
+                attachment_count, attachment_tasks, attachment_names = (
+                    self._process_attachments(
+                        message,
+                        rule,
+                        tag_ids,
+                        doc_type,
+                        queue_tasks=False,
+                    )
+                )
+                processed_elements += attachment_count
+                consume_tasks.extend(attachment_tasks)
+                bundle_item_names.extend(attachment_names)
+
+            self._queue_or_mark_processed(
+                consume_tasks=consume_tasks,
+                rule=rule,
+                message=message,
+                bundle_item_names=bundle_item_names,
+            )
+
+            return processed_elements
+
         if (
             rule.consumption_scope == MailRule.ConsumptionScope.EML_ONLY
             or rule.consumption_scope == MailRule.ConsumptionScope.EVERYTHING
@@ -757,6 +813,46 @@ class MailAccountHandler(LoggingMixin):
             )
 
         return processed_elements
+
+    def _queue_or_mark_processed(
+        self,
+        *,
+        consume_tasks: list[Signature],
+        rule: MailRule,
+        message: MailMessage,
+        bundle_item_names: list[str] | None = None,
+    ) -> None:
+        if consume_tasks:
+            queue_consumption_tasks(
+                consume_tasks=consume_tasks,
+                rule=rule,
+                message=message,
+                bundle_item_names=bundle_item_names,
+            )
+        else:
+            self._mark_processed_without_consumption(rule, message)
+
+    def _mark_processed_without_consumption(
+        self,
+        rule: MailRule,
+        message: MailMessage,
+    ) -> None:
+        if ProcessedMail.objects.filter(
+            rule=rule,
+            uid=message.uid,
+            folder=rule.folder,
+        ).exists():
+            return
+        ProcessedMail.objects.create(
+            rule=rule,
+            folder=rule.folder,
+            uid=message.uid,
+            subject=message.subject,
+            received=make_aware(message.date)
+            if is_naive(message.date)
+            else message.date,
+            status="PROCESSED_WO_CONSUMPTION",
+        )
 
     def filename_inclusion_matches(
         self,
@@ -801,10 +897,13 @@ class MailAccountHandler(LoggingMixin):
         rule: MailRule,
         tag_ids,
         doc_type,
+        *,
+        queue_tasks: bool = True,
     ):
         processed_attachments = 0
 
         consume_tasks = []
+        bundle_item_names = []
 
         for att in message.attachments:
             if (
@@ -903,6 +1002,7 @@ class MailAccountHandler(LoggingMixin):
                 )
 
                 consume_tasks.append(consume_task)
+                bundle_item_names.append(att.filename or title or "attachment")
 
                 processed_attachments += 1
             else:
@@ -913,29 +1013,14 @@ class MailAccountHandler(LoggingMixin):
                     f"by paperless",
                 )
 
-        if len(consume_tasks) > 0:
-            queue_consumption_tasks(
-                consume_tasks=consume_tasks,
-                rule=rule,
-                message=message,
-            )
-        else:
-            # No files to consume, just mark as processed if it wasn't by .eml processing
-            if not ProcessedMail.objects.filter(
-                rule=rule,
-                uid=message.uid,
-                folder=rule.folder,
-            ).exists():
-                ProcessedMail.objects.create(
-                    rule=rule,
-                    folder=rule.folder,
-                    uid=message.uid,
-                    subject=message.subject,
-                    received=make_aware(message.date)
-                    if is_naive(message.date)
-                    else message.date,
-                    status="PROCESSED_WO_CONSUMPTION",
-                )
+        if not queue_tasks:
+            return processed_attachments, consume_tasks, bundle_item_names
+
+        self._queue_or_mark_processed(
+            consume_tasks=consume_tasks,
+            rule=rule,
+            message=message,
+        )
 
         return processed_attachments
 
@@ -945,6 +1030,8 @@ class MailAccountHandler(LoggingMixin):
         rule: MailRule,
         tag_ids,
         doc_type,
+        *,
+        queue_tasks: bool = True,
     ):
         settings.SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
         _, temp_filename = tempfile.mkstemp(
@@ -1000,11 +1087,14 @@ class MailAccountHandler(LoggingMixin):
             overrides=doc_overrides,
         ).set(headers={"trigger_source": PaperlessTask.TriggerSource.EMAIL_CONSUME})
 
+        processed_elements = 1
+        if not queue_tasks:
+            return processed_elements, [consume_task], ["mail body"]
+
         queue_consumption_tasks(
             consume_tasks=[consume_task],
             rule=rule,
             message=message,
         )
 
-        processed_elements = 1
         return processed_elements

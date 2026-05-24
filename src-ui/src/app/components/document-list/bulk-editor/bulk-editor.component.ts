@@ -14,6 +14,7 @@ import { saveAs } from 'file-saver'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import { first, map, Observable, Subject, switchMap, takeUntil } from 'rxjs'
 import { ConfirmDialogComponent } from 'src/app/components/common/confirm-dialog/confirm-dialog.component'
+import { DocumentBundleEditDialogComponent } from 'src/app/components/document-bundle-edit-dialog/document-bundle-edit-dialog.component'
 import { CustomField } from 'src/app/data/custom-field'
 import { MatchingModel } from 'src/app/data/matching-model'
 import { SelectionDataItem } from 'src/app/data/results'
@@ -28,6 +29,7 @@ import {
 } from 'src/app/services/permissions.service'
 import { CorrespondentService } from 'src/app/services/rest/correspondent.service'
 import { CustomFieldsService } from 'src/app/services/rest/custom-fields.service'
+import { DocumentBundleService } from 'src/app/services/rest/document-bundle.service'
 import { DocumentTypeService } from 'src/app/services/rest/document-type.service'
 import {
   DocumentBulkEditMethod,
@@ -94,6 +96,7 @@ export class BulkEditorComponent
   private customFieldService = inject(CustomFieldsService)
   private permissionService = inject(PermissionsService)
   private savedViewService = inject(SavedViewService)
+  private readonly documentBundleService = inject(DocumentBundleService)
   private readonly shareLinkBundleService = inject(ShareLinkBundleService)
 
   tagSelectionModel = new FilterableDropdownSelectionModel(true)
@@ -319,6 +322,54 @@ export class BulkEditorComponent
       $localize`Error executing bulk operation`,
       error
     )
+  }
+
+  createDocumentBundle() {
+    const documentIds = this.list.documents
+      .filter((document) => this.list.selected.has(document.id))
+      .map((document) => document.id)
+    this.documentBundleService
+      .suggestId()
+      .pipe(first())
+      .subscribe({
+        next: ({ bundle_id }) =>
+          this.openCreateBundleDialog(documentIds, bundle_id),
+        error: () => this.openCreateBundleDialog(documentIds),
+      })
+  }
+
+  private openCreateBundleDialog(
+    documentIds: number[],
+    suggestedBundleId: string = ''
+  ) {
+    const modal = this.modalService.open(DocumentBundleEditDialogComponent, {
+      backdrop: 'static',
+    })
+    modal.componentInstance.mode = 'create'
+    modal.componentInstance.bundle = {
+      name: '',
+      bundle_id: suggestedBundleId,
+    }
+    modal.componentInstance.description = $localize`Create a bundle from ${documentIds.length} selected document(s).`
+    modal.componentInstance.saved.subscribe(({ name, bundle_id }) => {
+      modal.componentInstance.networkActive = true
+      this.documentBundleService
+        .createFromDocuments(documentIds, bundle_id, name)
+        .pipe(first())
+        .subscribe({
+          next: (bundle) => {
+            this.toastService.showInfo(
+              $localize`Successfully created bundle "${bundle.bundle_id}".`
+            )
+            this.handleOperationSuccess(modal, true)
+          },
+          error: (error) => {
+            modal.componentInstance.networkActive = false
+            modal.componentInstance.error = error?.error ?? error
+            this.handleOperationError(null, error)
+          },
+        })
+    })
   }
 
   private applySelectionData(

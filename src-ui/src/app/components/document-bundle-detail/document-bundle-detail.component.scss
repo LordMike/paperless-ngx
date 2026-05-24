@@ -1,0 +1,13 @@
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+.drag-handle {
+  cursor: grab;
+}
+
+.cdk-drag-preview {
+  background: var(--pngx-bg);
+  box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15);
+}

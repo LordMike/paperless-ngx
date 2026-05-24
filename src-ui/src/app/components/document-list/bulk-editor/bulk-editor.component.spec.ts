@@ -10,6 +10,7 @@ import { By } from '@angular/platform-browser'
 import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule, allIcons } from 'ngx-bootstrap-icons'
 import { of, throwError } from 'rxjs'
+import { DocumentBundleEditDialogComponent } from 'src/app/components/document-bundle-edit-dialog/document-bundle-edit-dialog.component'
 import { Correspondent } from 'src/app/data/correspondent'
 import { CustomField, CustomFieldDataType } from 'src/app/data/custom-field'
 import { DocumentType } from 'src/app/data/document-type'
@@ -1683,6 +1684,58 @@ describe('BulkEditorComponent', () => {
       expect.objectContaining({ backdrop: 'static', size: 'lg' })
     )
     openSpy.mockRestore()
+  })
+
+  it('should ask for bundle details before creating a document bundle', () => {
+    jest
+      .spyOn(documentListViewService, 'documents', 'get')
+      .mockReturnValue([{ id: 5 }, { id: 7 }] as any)
+    jest
+      .spyOn(documentListViewService, 'selected', 'get')
+      .mockReturnValue(new Set([5, 7]))
+    const successSpy = jest
+      .spyOn(component as any, 'handleOperationSuccess')
+      .mockImplementation(() => {})
+    const saved = new EventEmitter<{ name: string; bundle_id: string }>()
+    const modalRef: Partial<NgbModalRef> = {
+      close: jest.fn(),
+      componentInstance: {
+        saved,
+        networkActive: false,
+      },
+    }
+    const openSpy = jest
+      .spyOn(modalService, 'open')
+      .mockReturnValue(modalRef as NgbModalRef)
+
+    component.createDocumentBundle()
+
+    const suggestReq = httpTestingController.expectOne(
+      `${environment.apiBaseUrl}bundles/suggest_id/`
+    )
+    suggestReq.flush({ bundle_id: 'BND-00A' })
+
+    expect(openSpy).toHaveBeenCalledWith(DocumentBundleEditDialogComponent, {
+      backdrop: 'static',
+    })
+    expect(modalRef.componentInstance.mode).toBe('create')
+    expect(modalRef.componentInstance.bundle.bundle_id).toBe('BND-00A')
+    expect(modalRef.componentInstance.description).toContain('2 selected')
+
+    saved.emit({ name: 'Policy package', bundle_id: 'BND-00A' })
+
+    const createReq = httpTestingController.expectOne(
+      `${environment.apiBaseUrl}bundles/`
+    )
+    expect(createReq.request.method).toBe('POST')
+    expect(createReq.request.body).toEqual({
+      documents: [5, 7],
+      bundle_id: 'BND-00A',
+      name: 'Policy package',
+    })
+    createReq.flush({ id: 12, bundle_id: 'BND-00A' })
+
+    expect(successSpy).toHaveBeenCalledWith(modalRef, true)
   })
 
   it('should handle share link bundle creation errors', () => {

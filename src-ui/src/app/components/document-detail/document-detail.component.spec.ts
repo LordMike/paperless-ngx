@@ -840,29 +840,29 @@ describe('DocumentDetailComponent', () => {
     expect(
       fixture.debugElement
         .queryAll(By.css('button'))
-        .find((b) => b.nativeElement.textContent === 'Save')
+        .find((b) => b.nativeElement.textContent.trim() === 'Save')
     ).not.toBeUndefined()
     expect(
       fixture.debugElement
         .queryAll(By.css('button'))
-        .find((b) => b.nativeElement.textContent === 'Save & close')
+        .find((b) => b.nativeElement.textContent.trim() === 'Save & close')
     ).not.toBeUndefined()
     expect(
       fixture.debugElement
         .queryAll(By.css('button'))
-        .find((b) => b.nativeElement.textContent === 'Save & next')
+        .find((b) => b.nativeElement.textContent.trim() === 'Save & next')
     ).toBeUndefined()
     nextSpy.mockReturnValue(true)
     fixture.detectChanges()
     expect(
       fixture.debugElement
         .queryAll(By.css('button'))
-        .find((b) => b.nativeElement.textContent === 'Save & close')
+        .find((b) => b.nativeElement.textContent.trim() === 'Save & close')
     ).toBeUndefined()
     expect(
       fixture.debugElement
         .queryAll(By.css('button'))
-        .find((b) => b.nativeElement.textContent === 'Save & next')
+        .find((b) => b.nativeElement.textContent.trim() === 'Save & next')
     ).not.toBeUndefined()
   })
 

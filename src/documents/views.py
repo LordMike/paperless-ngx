@@ -108,6 +108,7 @@ from documents import bulk_edit
 from documents.bulk_download import ArchiveOnlyStrategy
 from documents.bulk_download import OriginalAndArchiveStrategy
 from documents.bulk_download import OriginalsOnlyStrategy
+from documents.bundle_api import bundle_membership_prefetch
 from documents.caching import get_llm_suggestion_cache
 from documents.caching import get_metadata_cache
 from documents.caching import get_suggestion_cache
@@ -1061,6 +1062,7 @@ class DocumentViewSet(
                     "custom_fields",
                     queryset=CustomFieldInstance.objects.select_related("field"),
                 ),
+                bundle_membership_prefetch(),
                 "notes",
             )
         )

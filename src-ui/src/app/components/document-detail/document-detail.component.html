@@ -34,6 +34,8 @@
     (versionsUpdated)="onVersionsUpdated($event)"
   />
 
+  <pngx-document-bundle-menu [document]="document" [documentId]="documentId" />
+
   <div class="btn-group">
     <button (click)="download()" class="btn btn-sm btn-outline-primary" [disabled]="downloading">
       @if (downloading) {
@@ -349,6 +351,15 @@
               <pngx-metadata-collapse i18n-title title="Archived document metadata" [metadata]="metadata.archive_metadata"></pngx-metadata-collapse>
             }
 
+          </ng-template>
+        </li>
+
+        <li [ngbNavItem]="DocumentDetailNavIDs.Bundle">
+          <a class="text-nowrap" ngbNavLink i18n>Bundle @if (document?.bundle) {
+            <span class="badge text-bg-secondary ms-1">1</span>
+          }</a>
+          <ng-template ngbNavContent>
+            <pngx-document-bundle-tab [document]="document" [documentId]="documentId" [userCanEdit]="userCanEdit" (bundleChanged)="onBundleChanged()" />
           </ng-template>
         </li>
 

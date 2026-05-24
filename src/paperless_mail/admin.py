@@ -71,6 +71,7 @@ class MailRuleAdmin(GuardedModelAdmin):
                     "maximum_age",
                     "consumption_scope",
                     "attachment_type",
+                    "bundle_documents",
                 ),
             },
         ),

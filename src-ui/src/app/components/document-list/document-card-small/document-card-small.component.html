@@ -46,6 +46,12 @@
           @if (displayFields.includes(DisplayField.TITLE)) {
             {{document.title | documentTitle}}
           }
+          @if (document.bundle) {
+            <a class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border ms-1 text-decoration-none"
+              routerLink="/attributes/bundles/{{document.bundle.id}}"
+              title="Open bundle" i18n-title
+              (click)="$event.stopPropagation()">{{document.bundle.bundle_id}}</a>
+          }
         } @else {
           <div class="placeholder bg-secondary w-100"></div>
           <div class="placeholder bg-secondary w-50"></div>

@@ -1,0 +1,45 @@
+<form [formGroup]="bundleForm" (ngSubmit)="save()" autocomplete="off">
+  <div class="modal-header">
+    <h4 class="modal-title">
+      @if (mode === 'create') {
+        <ng-container i18n>Create new bundle</ng-container>
+      } @else {
+        <ng-container i18n>Edit bundle</ng-container>
+      }
+    </h4>
+    @if (bundle?.id) {
+      <span class="badge bg-primary text-primary-text-contrast ms-2">ID: {{bundle.id}}</span>
+    }
+    <button type="button" [disabled]="!closeEnabled" class="btn-close" aria-label="Close" (click)="close()"></button>
+  </div>
+  <div class="modal-body">
+    @if (description) {
+      <p class="text-muted">{{description}}</p>
+    }
+    <div class="mb-3">
+      <label class="form-label" for="bundleName" i18n>Name</label>
+      <input id="bundleName" class="form-control" formControlName="name" autocomplete="off">
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="bundleId" i18n>Bundle ID</label>
+      <input id="bundleId" class="form-control" formControlName="bundle_id" autocomplete="off" [class.is-invalid]="getBundleIdError()">
+      @if (getBundleIdError()) {
+        <div class="invalid-feedback">{{getBundleIdError()}}</div>
+      }
+    </div>
+    @if (getFormError()) {
+      <div class="alert alert-danger mb-0">
+        {{getFormError()}}
+      </div>
+    }
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" (click)="close()" [disabled]="networkActive" i18n>Cancel</button>
+    <button type="submit" class="btn btn-primary" [disabled]="networkActive">
+      @if (networkActive) {
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+      }
+      <ng-container i18n>Save</ng-container>
+    </button>
+  </div>
+</form>
